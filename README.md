@@ -1,12 +1,13 @@
-# Uchile Edx Login
-![https://github.com/eol-uchile/norteamericanoapi/actions](https://github.com/eol-uchile/norteamericanoapi/workflows/Python%20application/badge.svg)
+# Norteamericano API
+![https://github.com/eol-virtuallabx/norteamericano-api/actions](https://github.com/eol-virtuallabx/norteamericano-api/workflows/Python%20application/badge.svg)
 
 # Install App
 
-    docker-compose exec lms pip install -e /openedx/requirements/norteamericanoapi && docker-compose exec cms pip install -e /openedx/requirements/norteamericanoapi
+    docker-compose exec lms pip install -e /openedx/requirements/norteamericano-api
+    docker-compose exec cms pip install -e /openedx/requirements/norteamericano-api
 
 ## TESTS
 **Prepare tests:**
 
     > cd .github/
-    > docker-compose run cms /openedx/requirements/norteamericanoapi/.github/test.sh
+    > docker-compose run cms /openedx/requirements/norteamericano-api/.github/test.sh
