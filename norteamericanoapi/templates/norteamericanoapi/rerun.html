@@ -1,0 +1,165 @@
+## mako 
+
+<%page expression_filter="h"/>
+<%inherit file="../base.html" />
+<%block name="title">ReRun</%block>
+<%block name="content">
+<main id="main" aria-label="Content" tabindex="-1" class="static_pages">
+<style>
+#main html, #main body {
+    font-family: "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size: 1rem;
+    font-style: normal;
+    line-height: 1em;
+}
+#main h1{
+    color: #313131;
+    font: normal 2em/1.4em "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+    margin: 0;
+    margin-bottom: 30px;
+    text-align: center;
+}
+.form-group label {    
+    color: #313131;
+    font: italic 300 1rem/1.6rem Georgia,Cambria,"Times New Roman",Times,serif;
+    margin-bottom: 5px;
+    text-shadow: 0 1px rgba(255,255,255,0.4);
+    -webkit-font-smoothing: antialiased;
+    font-size: 100%;
+}
+form input[type="submit"], form input[type="button"]{
+    border-radius: 3px;
+    border: 1px solid #000663;
+    border-bottom: 1px solid #00003a;
+    border-radius: 5px;
+    box-shadow: inset 0 1px 0 0 #2592c0;
+    color: #fff;
+    display: inline-block;
+    font-size: inherit;
+    font-weight: bold;
+    background-color: #0075b4;
+    background-image: -webkit-linear-gradient(top, #0075b4 0%,#004393 50%,#002a84 50%,#002f86 100%);
+    background-image: linear-gradient(to bottom,#0075b4 0%,#004393 50%,#002a84 50%,#002f86 100%);
+    padding: 7px 18px;
+    text-align: center;
+    text-decoration: none;
+    text-shadow: 0 -1px 1px #000042;
+    font: normal 1.2rem/1.6rem "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+    letter-spacing: 1px;
+    padding: 4px 20px;
+    vertical-align: top;
+    -webkit-font-smoothing: antialiased;
+    font-size: 100%;
+}
+#maink table, #main table tr, #main table td {
+    border: 1px solid black;
+    vertical-align: middle;
+    padding: 7px;
+}
+.error-message{
+    color: #ff0000;
+}
+</style>
+    <h1>ReRun Cursos</h1>
+    <div style="text-align: center">
+        % if context.get('errors', UNDEFINED) is not UNDEFINED:
+            % if context['errors'].get('not_file', UNDEFINED) is not UNDEFINED:
+                <p id="not_file" style="color:firebrick; margin-bottom: 15px;">Falta agregar CSV.</p>
+            % endif
+        % endif
+      <form method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="csrfmiddlewaretoken" value="${csrf_token}"/>
+          <div class="form-group" style="margin: 15px 15px;">
+              <label for="file" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Archivo CSV:</label>
+              <input class="input setting-input" name="file" id="file" type="file" accept=".csv" />
+          </div>
+          <a href="/norteamericano_api/rerun-export/" style="display: inline-flex;">
+            <button type="button">Exportar Planilla</button>
+          </a>
+          <input type="submit" style="height: 38px;text-shadow: none; border-color:white; background-color: #0075b4; background-image: none; display:inline-flex; margin: auto" value="ReRun">
+      </form>
+  </div>
+  <div style="text-align: center; margin-top: 50px;">
+    <hr style="max-width: 80%;">
+    <h3 style="margin-bottom: 5px;"><b>ReRun Pendientes</b></h3>
+    <div id="ui-loading-load" class="ui-loading" style="box-shadow: none;background-color: transparent;">
+        <p>
+        <span class="spin">
+            <span class="icon fa fa-refresh" aria-hidden="true"></span>
+        </span>
+        <span class="copy">Cargando</span>
+        </p>
+    </div>
+    <div id='no-pending-tasks' class="no-pending-tasks-message" style="display: none;"><p>No hay rerun de cursos pendientes.</p></div>
+    <div id="error-message" class="error-message" style="display: none;"><p>Error en obtener los cursos pendientes, actualice la página y si el error persiste contacte con mesa de ayuda de la plataforma</p></div>
+    <div id="pending-tasks" class="pending-tasks" style="display: none;">
+        <table style="text-align: center;margin-left:auto;margin-right:auto;margin-top: 14px;margin-bottom: 14px;">
+            <thead>
+                <tr>
+                    <td>Origen Course Id</td>
+                    <td>Nuevo Course Id</td>
+                    <td style="max-width: 300px;">Nombre Curso</td>
+                    <td>Estado</td>
+                </tr>
+            </thead>
+            <tbody id="courses-pending">
+            </tbody>
+        </table>
+    </div>
+  </div>
+  <script type="text/javascript">
+        const ui_loading = document.getElementById("ui-loading-load");
+        const no_pending_tasks = document.getElementById("no-pending-tasks");
+        const error_message = document.getElementById("error-message");
+        const pending_tasks = document.getElementById("pending-tasks");
+        const get_course_pending = function(){
+            no_pending_tasks.style.display = "none";
+            error_message.style.display = "none";
+            pending_tasks.style.display = "none";
+            $.ajax({
+                url: `${url_pending_courses}`,
+                dataType: 'json',
+                cache: false,
+                contentType: "application/json",
+                processData: false,
+                type: "GET",
+                xhrFields: {
+                    withCredentials: true
+                },
+                success: function(response){
+                    ui_loading.style.display = "none";
+                    if(response.result == 'success'){
+                        if(response.courses.length == 0){
+                            no_pending_tasks.style.display = "block";
+                        }
+                        else{
+                            create_tbody(response.courses);
+                            pending_tasks.style.display = "block";
+                        }
+                    }
+                    else{
+                        error_message.style.display = "block";
+                    }
+                    setTimeout(get_course_pending, 10000);
+                },
+                error: function() {
+                    ui_loading.style.display = "none";
+                    error_message.style.display = "block";
+                    setTimeout(get_course_pending, 10000);
+                }
+            });
+        }
+        const create_tbody = function(data){
+            let tbody = document.getElementById('courses-pending');
+            tbody.innerHTML = '';
+            data.forEach(course => {
+                let aux = `<tr><td>`+course.origen_course_id+`</td><td>`+course.new_course_id+`</td><td>`+course.display_name+`</td><td>`+course.state+`</td></tr>`;
+                tbody.innerHTML = tbody.innerHTML + aux;
+            });
+        }
+        $(function($) {
+            get_course_pending();
+        })
+  </script>
+</main>
+</%block>

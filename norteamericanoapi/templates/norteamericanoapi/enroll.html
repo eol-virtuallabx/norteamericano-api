@@ -1,0 +1,117 @@
+## mako 
+
+<%page expression_filter="h"/>
+<%inherit file="../base.html" />
+<%block name="title">Inscripción</%block>
+<%block name="content">
+<main id="main" aria-label="Content" tabindex="-1" class="static_pages">
+    <style>
+
+        #main html, #main body {
+            font-family: "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+            font-size: 1rem;
+            font-style: normal;
+            line-height: 1em;
+        }
+        #main h1{
+            color: #313131;
+            font: normal 2em/1.4em "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+            margin: 0;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .form-group label {    
+            color: #313131;
+            font: italic 300 1rem/1.6rem "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+            margin-bottom: 5px;
+            text-shadow: 0 1px rgba(255,255,255,0.4);
+            -webkit-font-smoothing: antialiased;
+            font-size: 100%;
+        }
+        .form-group input[type="text"] {
+            background: #fff;
+            border: 1px solid #c8c8c8;
+            border-radius: 3px;
+            box-shadow: 0 1px 0 0 rgba(255,255,255,0.6), inset 0 0 3px 0 rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            font: italic 300 1rem/1.6rem"Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+            height: 35px;
+            padding: 5px 12px;
+            vertical-align: top;
+            -webkit-font-smoothing: antialiased;
+            font-size: 100%;
+        }
+        form input[type="submit"], form input[type="button"]{
+            border-radius: 3px;
+            border: 1px solid #000663;
+            border-bottom: 1px solid #00003a;
+            border-radius: 5px;
+            box-shadow: inset 0 1px 0 0 #2592c0;
+            color: #fff;
+            display: inline-block;
+            font-size: inherit;
+            font-weight: bold;
+            background-color: #0075b4;
+            background-image: -webkit-linear-gradient(top, #0075b4 0%,#004393 50%,#002a84 50%,#002f86 100%);
+            background-image: linear-gradient(to bottom,#0075b4 0%,#004393 50%,#002a84 50%,#002f86 100%);
+            padding: 7px 18px;
+            text-align: center;
+            text-decoration: none;
+            text-shadow: 0 -1px 1px #000042;
+            font: normal 1.2rem/1.6rem "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+            letter-spacing: 1px;
+            padding: 4px 20px;
+            vertical-align: top;
+            -webkit-font-smoothing: antialiased;
+            font-size: 100%;
+        }
+    </style>
+    <h1>Inscripción de Alumnos</h1>
+    <div style="text-align: center">
+        % if context.get('errors', UNDEFINED) is not UNDEFINED:
+            % if context['errors'].get('error_permission', UNDEFINED) is not UNDEFINED:
+                <p id="error_permission" style="color:firebrick; margin-bottom: 15px;">Usuario no tiene permisos suficientes.</p>
+            % endif
+            % if context['errors'].get('error_mode', UNDEFINED) is not UNDEFINED:
+                <p id="error_mode" style="color:firebrick; margin-bottom: 15px;">El modo esta incorrecto.</p>
+            % endif
+            % if context['errors'].get('not_file', UNDEFINED) is not UNDEFINED:
+                <p id="not_file" style="color:firebrick; margin-bottom: 15px;">Falta agregar CSV.</p>
+            % endif
+            % if context['errors'].get('not_course', UNDEFINED) is not UNDEFINED:
+                <p id="not_course" style="color:firebrick; margin-bottom: 15px;">Falta agregar curso.</p>
+            % endif
+            % if context['errors'].get('wrong_course', UNDEFINED) is not UNDEFINED:
+                <p id="wrong_course" style="color:firebrick; margin-bottom: 15px;">Id del curso no existe o es incorrecto.</p>
+            % endif
+        % endif
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrfmiddlewaretoken" value="${csrf_token}"/>
+            <div class="form-group" style="margin: 15px 15px;">
+                <label for="course" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">ID Curso:</label>
+                <input type="text" name='course' id="course" placeholder="course-v1:mss+MSS001+2019_2" value='${curso}'></input>
+            </div>
+            <div class="form-group" style="margin: 15px 15px;">
+                <label for="file" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">CSV:</label>
+                <input class="input setting-input" name="file" id="file" type="file" accept=".csv" />
+            </div>
+            <div class="form-group" style="margin: 15px 15px;">
+                <label for="mode" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Modo:</label>
+                <select class="inputwidth1" style="font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;" name='mode'>
+                    % if context.get('modo', UNDEFINED) == 'audit':
+                        <option value="audit" selected>audit</option>
+                        <option value="honor">honor</option>
+                    % else:
+                        <option value="audit">audit</option>
+                        <option value="honor" selected>honor</option>
+                    % endif
+                </select>
+            </div>
+            <a href="/norteamericano_api/enroll-export/" style="display: inline-flex;">
+            <button type="button">Exportar Planilla</button>
+            </a>
+            <input type="submit" style="height: 38px;text-shadow: none; border-color:white; background-color: #0075b4; background-image: none; display:inline-flex; margin: auto" value="Inscribir">
+        </form>
+    </div>
+</main>
+</%block>
