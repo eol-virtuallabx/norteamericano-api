@@ -12,4 +12,4 @@ jobs:
     - name: Run Tests
       run: |        
         cd .github/
-        docker-compose run lms /openedx/requirements/norteamericanoapi/.github/test.sh
+        docker-compose run cms /openedx/requirements/norteamericanoapi/.github/test.sh
