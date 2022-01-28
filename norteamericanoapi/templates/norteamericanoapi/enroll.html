@@ -85,6 +85,9 @@
                 <p id="wrong_course" style="color:firebrick; margin-bottom: 15px;">Id del curso no existe o es incorrecto.</p>
             % endif
         % endif
+        % if context.get('HAVE_NA_MODEL', False) is False:
+            <p id="HAVE_NA_MODEL" style="color:firebrick; margin-bottom: 15px;">Falta modelo, contactese con la mesa de ayuda de la plataforma.</p>
+        % endif
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrfmiddlewaretoken" value="${csrf_token}"/>
             <div class="form-group" style="margin: 15px 15px;">

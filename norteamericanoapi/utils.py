@@ -27,6 +27,11 @@ import csv
 import re
 import io
 from django.contrib.auth.base_user import BaseUserManager
+try:
+    from norteamericano_form.models import NAExtraInfo
+    HAVE_NA_MODEL = True
+except ImportError:
+    HAVE_NA_MODEL = False
 logger = logging.getLogger(__name__)
 regex = r'^(([^<>()\[\]\.,;:\s@\"]+(\.[^<>()\[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$'
 regex_names = r'^[A-Za-z\s\_]+$'
@@ -349,52 +354,100 @@ def file_to_csvreader(csvfile):
     header = next(csv_reader)
     return csv_reader
 
-def enroll_create_user(csv_data, course_id, mode):
+def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
     """
         Create and enroll the user
     """
-    new_data = [['Email', 'Nombres', 'Apellidos', 'Username', 'Estado']]
+    new_data = [['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Username', 'Estado']]
     emails_data = []
     with transaction.atomic():
         for row in csv_data:
-            row[0] = row[0].lower()
-            aux_pass = ''
-            aux_user = False
-            try:
-                user = User.objects.get(email=row[0])
-                aux_user = True
-            except User.DoesNotExist:
-                if re.match(regex, row[0]):
-                    aux_pass = BaseUserManager().make_random_password(12).lower()
-                    user_data = {
-                        'email':row[0],
-                        'names':row[1],
-                        'lastnames':row[2],
-                        'pass': aux_pass
-                    }
-                    user = create_user_by_data(user_data)
+            if len(row) != 7:
+                aux_row = ['','','','','','', 'Esta fila no tiene 7 columnas']
+                if len(row) < 7:
+                    new_data.append(row + aux_row[len(row):])
                 else:
-                    user = None
-            if user:
-                enroll_course_user(user, course_id, mode)
+                    new_data.append(row[:5] + aux_row[-2:])
+                continue
+            row[0] = row[0].lower()
+            row[4] = row[4].upper()
+            row[4] = row[4].replace("-", "")
+            row[4] = row[4].replace(".", "")
+            row[4] = row[4].strip()
+            aux_pass = ''
+            error = ''
+            user_created = False
+            if not validarRutAllType(row[4]):
+                aux_row = ['','','','','','', 'Rut/Pasaporte invalido']
+                if len(row) < 7:
+                    new_data.append(row + aux_row[len(row):])
+                else:
+                    new_data.append(row[:5] + aux_row[-2:])
+                continue
+            if row[4][0] != 'P':
+                row[4] = '{}-{}'.format(row[4][:-1], row[4][-1])
+            if NAExtraInfo.objects.filter(na_rut=row[4]).exists():
+                na_user = NAExtraInfo.objects.get(na_rut=row[4])
+            else:
+                try:
+                    user = User.objects.get(email=row[0])
+                    if NAExtraInfo.objects.filter(user=user).exists():
+                        user = None
+                        error = 'EL correo esta asociado a otro rut'
+                except User.DoesNotExist:
+                    if re.match(regex, row[0]):
+                        aux_pass = BaseUserManager().make_random_password(12)
+                        aux_pass = aux_pass.lower()
+                        user_data = {
+                            'email':row[0],
+                            'names':row[3],
+                            'lastnames': '{} {}'.format(row[1], row[2]),
+                            'pass': aux_pass
+                        }
+                        user = create_user_by_data(user_data)
+                        user_created = True
+                    else:
+                        user = None
+                        error = 'Formato del correo incorrecto'
+                if user:
+                    na_user = create_na_user(row, user)
+                else:
+                    na_user = None
+            if na_user:
+                enroll_course_user(na_user.user, course_id, mode)
                 new_data.append([
-                    row[0],row[1],row[2],
-                    user.username,
-                    'Inscrito' if aux_user else 'Creado e Inscrito'
+                    row[0],row[1],row[2],row[3],row[4],
+                    na_user.user.username,
+                    'Inscrito' if aux_pass == '' else 'Creado e Inscrito'
                 ])
                 emails_data.append({
                     'email':row[0],
-                    'user_name': user.profile.name.strip(),
-                    'password': aux_pass,
-                    'exists': aux_user
+                    'user_name': na_user.user.profile.name.strip(),
+                    'password': aux_pass
                 })
             else:
-                aux_row = ['','','','','Error, Revise los datos si estan correctos']
-                if len(row) < 5:
+                aux_row = ['','','','','','', error]
+                if len(row) < 7:
                     new_data.append(row + aux_row[len(row):])
                 else:
-                    new_data.append(row[:4] + [aux_row[-1]])
+                    new_data.append(row[:5] + aux_row[-2:])
     return {'new_data': new_data, 'emails_data': emails_data}
+
+def create_na_user(user_data, user):
+    """
+        Create the user given the user data.
+    """
+    with transaction.atomic():
+        na_user = NAExtraInfo.objects.create(
+            user=user,
+            na_names=user_data[3],
+            na_lastname_p=user_data[1],
+            na_lastname_m=user_data[2],
+            na_rut=user_data[4],
+            na_birth_date=user_data[5],
+            na_phone=user_data[6]
+        )
+    return na_user
 
 def rerun_courses(csv_data, user):
     """
@@ -434,3 +487,46 @@ def rerun_courses(csv_data, user):
                 aux_data[-1] = 'Error en relanzar el curso'
             new_data.append(aux_data)
     return new_data
+
+def validarRut(rut):
+    """
+        Verify if the 'rut' is valid
+    """
+    rut = rut.upper()
+    rut = rut.replace("-", "")
+    rut = rut.replace(".", "")
+    rut = rut.strip()
+    aux = rut[:-1]
+    dv = rut[-1:]
+
+    revertido = list(map(int, reversed(str(aux))))
+    factors = cycle(list(range(2, 8)))
+    s = sum(d * f for d, f in zip(revertido, factors))
+    res = (-s) % 11
+
+    if str(res) == dv:
+        return True
+    elif dv == "K" and res == 10:
+        return True
+    else:
+        return False
+
+def validarRutAllType(run):
+    """
+        Validate all Rut types
+    """
+    try:
+        if run[0] == 'P':
+            if 5 > len(run[1:]) or len(run[1:]) > 20:
+                logger.error("NorteamericanoAPI - Rut Passport wrong, rut".format(run))
+                return False
+        else:
+            if not validarRut(run):
+                logger.error("NorteamericanoAPI - Rut wrong, rut".format(run))
+                return False
+
+    except Exception:
+        logger.error("NorteamericanoAPI - Rut wrong, rut".format(run))
+        return False
+
+    return True

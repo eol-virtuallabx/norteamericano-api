@@ -22,9 +22,15 @@ from common.djangoapps.course_action_state.models import CourseRerunState
 from common.djangoapps.course_action_state.managers import CourseRerunUIStateManager
 from .utils import create_user_by_data, generate_username
 from django.test.utils import override_settings
+from unittest.case import SkipTest
 import re
 import json
 import urllib.parse
+try:
+    from norteamericano_form.models import NAExtraInfo
+    HAVE_NA_MODEL = True
+except ImportError:
+    HAVE_NA_MODEL = False
 
 class TestEnrollCSV(ModuleStoreTestCase):
     def setUp(self):
@@ -100,14 +106,29 @@ class TestEnrollCSV(ModuleStoreTestCase):
         """
             Test enroll user csv
         """
+        self.maxDiff = None
+        if not HAVE_NA_MODEL:
+            self.skipTest("import error norteamericano_form")
         mock_file_object = Mock()
         mock_file_object.configure_mock(name="file_name")
+        na_user = NAExtraInfo.objects.create(
+            user=self.student,
+            na_names='names',
+            na_lastname_p='father lastname',
+            na_lastname_m='mother lastname',
+            na_rut='11111111-1',
+            na_birth_date='10/10/2020',
+            na_phone='123456789'
+        )
         csv_reader.return_value = [
-            [self.student.email, 'a', 'b'],
-            ['aux.student2@edx.org', 'User', 'LastName'],
-            ['@edx.org', 'User', 'LastName'],
-            ['@edx.org', 'User', 'LastName1', 'LastName2', 'LastName3', 'LastName4'],
-            ['@edx.org'],
+            [self.student.email, 'a', 'b', 'c', na_user.na_rut,'10/10/2020','12345689'],
+            [self.student.email, 'a', 'b', 'c', 'PASDDAS','10/10/2020','12345689'],
+            ['aux.student2@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123456','10/10/2020','12345689'],
+            ['@edx.org', 'LastNameP', 'LastNameM', 'User', 'P789456','10/10/2020','12345689'],
+            ['qwe@edx.org', 'LastNameP', 'LastNameM', 'User', '456789123','10/10/2020','12345689'],
+            ['qwe@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123123123123123123123132123453689','10/10/2020','12345689'],
+            ['asd@edx.org', 'User', 'LastName1', 'LastName2', 'LastName3', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4'],
+            ['asd@edx.org']
             ]
         post_data = {
             "file": Mock(file=mock_file_object),
@@ -116,14 +137,19 @@ class TestEnrollCSV(ModuleStoreTestCase):
         }
         response = self.client.post(reverse('norteamericanoapi:enroll'), post_data)
         self.assertTrue(User.objects.filter(email="aux.student2@edx.org").exists())
+        self.assertTrue(NAExtraInfo.objects.filter(na_rut='P123456').exists())
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        data_student = '{};{};{};{};{}\r\n'.format('aux.student2@edx.org', 'User','LastName','user_lastname', 'Creado e Inscrito')
-        data_student_2 = '{};{};{};{};{}\r\n'.format(self.student.email, 'a','b',self.student.username, 'Inscrito')
-        data_student_3 = '{};{};{};{};{}\r\n'.format('@edx.org', 'User','LastName','', 'Error, Revise los datos si estan correctos')
-        data_student_4 = '{};{};{};{};{}\r\n'.format('@edx.org', 'User','LastName1','LastName2', 'Error, Revise los datos si estan correctos')
-        data_student_5 = '{};{};{};{};{}\r\n'.format('@edx.org', '','','', 'Error, Revise los datos si estan correctos')
-        expect = ['',"Email;Nombres;Apellidos;Username;Estado\r\n", data_student_2, data_student, data_student_3, data_student_4, data_student_5]
+        print(data)
+        data_student_1 = '{};{};{};{};{};{};{}\r\n'.format(self.student.email, 'a','b','c',na_user.na_rut,self.student.username, 'Inscrito')
+        data_student_2 = '{};{};{};{};{};{};{}\r\n'.format(self.student.email, 'a','b','c','PASDDAS','', 'EL correo esta asociado a otro rut')
+        data_student_3 = '{};{};{};{};{};{};{}\r\n'.format('aux.student2@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123456','user_lastnamep', 'Creado e Inscrito')
+        data_student_4 = '{};{};{};{};{};{};{}\r\n'.format('@edx.org', 'LastNameP', 'LastNameM', 'User', 'P789456','', 'Formato del correo incorrecto')
+        data_student_5 = '{};{};{};{};{};{};{}\r\n'.format('qwe@edx.org', 'LastNameP', 'LastNameM', 'User', '456789123','', 'Rut/Pasaporte invalido')
+        data_student_6 = '{};{};{};{};{};{};{}\r\n'.format('qwe@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123123123123123123123132123453689','', 'Rut/Pasaporte invalido')
+        data_student_7 = '{};{};{};{};{};{};{}\r\n'.format('asd@edx.org', 'User', 'LastName1', 'LastName2', 'LastName3','', 'Esta fila no tiene 7 columnas')
+        data_student_8 = '{};{};{};{};{};{};{}\r\n'.format('asd@edx.org', '', '', '', '','', 'Esta fila no tiene 7 columnas')
+        expect = ['',"Email;Apellido Paterno;Apellido Materno;Nombres;RUT;Username;Estado\r\n", data_student_1, data_student_2, data_student_3, data_student_4, data_student_5, data_student_6, data_student_7, data_student_8]
         self.assertEqual(data, expect)
 
     @patch('norteamericanoapi.views.file_to_csvreader')
@@ -318,7 +344,7 @@ class TestEnrollExportCSV(ModuleStoreTestCase):
         response = self.client.get(reverse('norteamericanoapi:enroll-export'))
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        expect = ['',"Email;Nombres;Apellidos\r\n"]
+        expect = ['',"Email;Apellido Paterno;Apellido Materno;Nombres;RUT;Fecha de Nacimiento;Fono\r\n"]
         self.assertEqual(data, expect)
 
         new_client = Client()

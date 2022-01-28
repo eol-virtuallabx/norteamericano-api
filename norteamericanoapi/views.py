@@ -7,7 +7,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic.base import View
 from django.http import HttpResponse
-from .utils import file_to_csvreader, validate_course, validate_user, enroll_create_user, rerun_courses
+from .utils import file_to_csvreader, validate_course, validate_user, enroll_create_user_with_custom_fields, rerun_courses, HAVE_NA_MODEL
 from .email_tasks import enroll_email
 from common.djangoapps.edxmako.shortcuts import render_to_response
 from cms.djangoapps.contentstore.views.course import get_in_process_course_actions
@@ -26,7 +26,7 @@ class NorteamericanoEnroll(View):
     """
     def get(self, request):
         if not request.user.is_anonymous:
-            context = {'modo': 'honor', 'curso':''}
+            context = {'modo': 'honor', 'curso':'', 'HAVE_NA_MODEL': HAVE_NA_MODEL}
             return render_to_response('norteamericanoapi/enroll.html', context)
         else:
             logger.error("NorteamericanoEnroll - User is Anonymous")
@@ -35,9 +35,11 @@ class NorteamericanoEnroll(View):
     def post(self, request):
         """
             csv file first column is email
-            [[email@email.com, names, lastnames],...]
+            [[email@email.com, lastnames_1, lastname_2, names, rut, birthday, phone],...]
         """
-        context = {'result': 'success', 'modo': request.POST.get('mode', ''), 'curso':request.POST.get('course', '')}
+        context = {'result': 'success', 'modo': request.POST.get('mode', ''), 'curso':request.POST.get('course', ''), 'HAVE_NA_MODEL': HAVE_NA_MODEL}
+        if HAVE_NA_MODEL is False:
+            return render_to_response('norteamericanoapi/enroll.html', context)
         if not request.user.is_anonymous:
             error_response = self.validate_data(request)
             if len(error_response) > 0:
@@ -46,7 +48,7 @@ class NorteamericanoEnroll(View):
                 return render_to_response('norteamericanoapi/enroll.html', context)
             csv_reader = file_to_csvreader(request.FILES.get('file').file)
             csv_data = [x for x in csv_reader]
-            data = enroll_create_user(csv_data, request.POST.get('course'), request.POST.get('mode'))
+            data = enroll_create_user_with_custom_fields(csv_data, request.POST.get('course'), request.POST.get('mode'))
             
             login_url = request.build_absolute_uri('/login')
             course = get_course_by_id(CourseKey.from_string(request.POST.get('course'))) 
@@ -99,7 +101,7 @@ class NorteamericanoEnrollExport(View):
                 response,
                 delimiter=';',
                 dialect='excel')
-            writer.writerow(['Email', 'Nombres', 'Apellidos'])
+            writer.writerow(['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Fecha de Nacimiento', 'Fono'])
             return response
         else:
             logger.error("NorteamericanoEnrollExport - User is Anonymous")

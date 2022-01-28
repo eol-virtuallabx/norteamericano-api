@@ -33,7 +33,7 @@ def enroll_email(data, courses_name, login_url):
         'login_url': login_url,
         'user_name': data['user_name']
     }
-    if data['exists']:
+    if data['password'] != '':
         html_message = render_to_string('emails/exists_user_email.txt', context)
     else:
         html_message = render_to_string('emails/normal_email.txt', context)
