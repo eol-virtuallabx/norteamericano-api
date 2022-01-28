@@ -11,4 +11,4 @@ ln -s /openedx/staticfiles .
 cd /openedx/requirements/norteamericanoapi
 
 #openedx-assets collect --settings=prod.assets
-EDXAPP_TEST_MONGO_HOST=mongodb python -Wd -m pytest --ds=cms.envs.test --junitxml=/openedx/edx-platform/reports/cms/nosetests.xml /openedx/requirements/norteamericanoapi/norteamericanoapi/tests.py::TestEnrollCSV::test_enroll_csv
+EDXAPP_TEST_MONGO_HOST=mongodb python -Wd -m pytest --ds=cms.envs.test --junitxml=/openedx/edx-platform/reports/cms/nosetests.xml /openedx/requirements/norteamericanoapi/norteamericanoapi/tests.py
