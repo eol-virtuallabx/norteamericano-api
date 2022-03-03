@@ -1,5 +1,5 @@
 #!/bin/dash
-pip install -e git+https://github.com/eol-virtuallabx/norteamericano_custom_form@d86b4eb3188387e1bd871aa34fcbb79d6d85df36#egg=norteamericano_custom_form
+pip install -e git+https://github.com/eol-virtuallabx/norteamericano_custom_form@cd360ec9903b4833d5d4572ff29cda7b36ff6c5b#egg=norteamericano_custom_form
 pip install -e /openedx/requirements/norteamericanoapi
 
 cd /openedx/requirements/norteamericanoapi

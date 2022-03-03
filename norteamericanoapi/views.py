@@ -25,7 +25,7 @@ class NorteamericanoEnroll(View):
         Enroll users
     """
     def get(self, request):
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             context = {'modo': 'honor', 'curso':'', 'HAVE_NA_MODEL': HAVE_NA_MODEL}
             return render_to_response('norteamericanoapi/enroll.html', context)
         else:
@@ -40,7 +40,7 @@ class NorteamericanoEnroll(View):
         context = {'result': 'success', 'modo': request.POST.get('mode', ''), 'curso':request.POST.get('course', ''), 'HAVE_NA_MODEL': HAVE_NA_MODEL}
         if HAVE_NA_MODEL is False:
             return render_to_response('norteamericanoapi/enroll.html', context)
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             error_response = self.validate_data(request)
             if len(error_response) > 0:
                 context['result'] = 'error'
@@ -93,7 +93,7 @@ class NorteamericanoEnrollExport(View):
     """
 
     def get(self, request):
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             response = HttpResponse(content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="planilla_enroll.csv"'
 
@@ -112,7 +112,7 @@ class NorteamericanoReRunPendingCourse(View):
         Get pending rerun courses
     """
     def get(self, request):
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             aux = get_in_process_course_actions(request)
             pending_courses = [ {'new_course_id':str(x.course_key), 'origen_course_id': str(x.source_course_key), 'display_name': x.display_name, 'state': x.state} for x in aux ]
             response = {'result': 'success', 'courses': pending_courses}
@@ -126,7 +126,7 @@ class NorteamericanoReRun(View):
         Rerun courses from CSV
     """
     def get(self, request):
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             context = {'url_pending_courses': reverse("norteamericanoapi:pending-courses")}
             return render_to_response('norteamericanoapi/rerun.html', context)
         else:
@@ -135,7 +135,7 @@ class NorteamericanoReRun(View):
 
     def post(self, request):
         context = {'result': 'success', 'url_pending_courses': reverse("norteamericanoapi:pending-courses")}
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             error_response = self.validate_data(request)
             if len(error_response) > 0:
                 context['result'] = 'error'
@@ -169,7 +169,7 @@ class NorteamericanoReRunExport(View):
     """
 
     def get(self, request):
-        if not request.user.is_anonymous:
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             response = HttpResponse(content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="planilla_rerun.csv"'
 

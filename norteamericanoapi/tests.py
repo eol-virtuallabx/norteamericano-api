@@ -48,6 +48,11 @@ class TestEnrollCSV(ModuleStoreTestCase):
             emit_signals=True)
         aux = CourseOverview.get_from_id(self.course2.id)
         with patch('common.djangoapps.student.models.cc.User.save'):
+            content_type = ContentType.objects.get_for_model(NAExtraInfo)
+            permission = Permission.objects.get(
+                codename='na_instructor_staff',
+                content_type=content_type,
+            )
             # staff user
             self.client = Client()
             self.user_staff = UserFactory(
@@ -55,6 +60,7 @@ class TestEnrollCSV(ModuleStoreTestCase):
                 password='12345',
                 email='student2@edx.org',
                 is_staff=True)
+            self.user_staff.user_permissions.add(permission)
             self.client.login(username='testuser3', password='12345')
 
             # user instructor
@@ -91,6 +97,7 @@ class TestEnrollCSV(ModuleStoreTestCase):
                 username='student',
                 password='12345',
                 email='student@edx.org')
+            self.student.user_permissions.add(permission)
             CourseEnrollmentFactory(
                 user=self.student, course_id=self.course.id)
             CourseEnrollmentFactory(
@@ -331,12 +338,18 @@ class TestEnrollExportCSV(ModuleStoreTestCase):
         super(TestEnrollExportCSV, self).setUp()
         with patch('common.djangoapps.student.models.cc.User.save'):
             # staff user
+            content_type = ContentType.objects.get_for_model(NAExtraInfo)
+            permission = Permission.objects.get(
+                codename='na_instructor_staff',
+                content_type=content_type,
+            )
             self.client = Client()
             self.user_staff = UserFactory(
                 username='testuser3',
                 password='12345',
                 email='student2@edx.org',
                 is_staff=True)
+            self.user_staff.user_permissions.add(permission)
             self.client.login(username='testuser3', password='12345')
 
     def test_enroll_export(self):
@@ -365,12 +378,18 @@ class TestReRunPendingCourse(ModuleStoreTestCase):
         super(TestReRunPendingCourse, self).setUp()
         with patch('common.djangoapps.student.models.cc.User.save'):
             # staff user
+            content_type = ContentType.objects.get_for_model(NAExtraInfo)
+            permission = Permission.objects.get(
+                codename='na_instructor_staff',
+                content_type=content_type,
+            )
             self.client = Client()
             self.user_staff = UserFactory(
                 username='testuser3',
                 password='12345',
                 email='student2@edx.org',
                 is_staff=True)
+            self.user_staff.user_permissions.add(permission)
             self.client.login(username='testuser3', password='12345')
 
     def test_pending_course(self):
@@ -409,6 +428,11 @@ class TestReRun(ModuleStoreTestCase):
             emit_signals=True)
         aux = CourseOverview.get_from_id(self.course.id)
         with patch('common.djangoapps.student.models.cc.User.save'):
+            content_type = ContentType.objects.get_for_model(NAExtraInfo)
+            permission = Permission.objects.get(
+                codename='na_instructor_staff',
+                content_type=content_type,
+            )
             # staff user
             self.client = Client()
             self.user_staff = UserFactory(
@@ -416,6 +440,7 @@ class TestReRun(ModuleStoreTestCase):
                 password='12345',
                 email='student2@edx.org',
                 is_staff=True)
+            self.user_staff.user_permissions.add(permission)
             self.client.login(username='testuser3', password='12345')
             # user student
             self.student_client = Client()
@@ -423,6 +448,7 @@ class TestReRun(ModuleStoreTestCase):
                 username='student',
                 password='12345',
                 email='student@edx.org')
+            self.student.user_permissions.add(permission)
             CourseEnrollmentFactory(
                 user=self.student, course_id=self.course.id)
             self.assertTrue(
@@ -583,12 +609,18 @@ class TestReRunExportCSV(ModuleStoreTestCase):
         super(TestReRunExportCSV, self).setUp()
         with patch('common.djangoapps.student.models.cc.User.save'):
             # staff user
+            content_type = ContentType.objects.get_for_model(NAExtraInfo)
+            permission = Permission.objects.get(
+                codename='na_instructor_staff',
+                content_type=content_type,
+            )
             self.client = Client()
             self.user_staff = UserFactory(
                 username='testuser3',
                 password='12345',
                 email='student2@edx.org',
                 is_staff=True)
+            self.user_staff.user_permissions.add(permission)
             self.client.login(username='testuser3', password='12345')
 
     def test_rerun_export(self):
