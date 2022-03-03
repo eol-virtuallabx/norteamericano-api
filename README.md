@@ -1,5 +1,5 @@
 # Norteamericano API
-![https://github.com/eol-virtuallabx/norteamericanoapi/actions](https://github.com/eol-virtuallabx/norteamericanoapi/workflows/Python%20application/badge.svg)
+![https://github.com/eol-virtuallabx/norteamericanoapi/actions](https://github.com/eol-virtuallabx/norteamericano-api/workflows/Python%20application/badge.svg)
 
 # Install App
 
