@@ -120,16 +120,27 @@ class TestEnrollCSV(ModuleStoreTestCase):
             na_birth_date='10/10/2020',
             na_phone='123456789'
         )
-        csv_reader.return_value = [
+        array_csv = [
             [self.student.email, 'a', 'b', 'c', na_user.na_rut,'10/10/2020','12345689'],
             [self.student.email, 'a', 'b', 'c', 'PASDDAS','10/10/2020','12345689'],
             ['aux.student2@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123456','10/10/2020','12345689'],
             ['@edx.org', 'LastNameP', 'LastNameM', 'User', 'P789456','10/10/2020','12345689'],
             ['qwe@edx.org', 'LastNameP', 'LastNameM', 'User', '456789123','10/10/2020','12345689'],
             ['qwe@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123123123123123123123132123453689','10/10/2020','12345689'],
-            ['asd@edx.org', 'User', 'LastName1', 'LastName2', 'LastName3', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4'],
-            ['asd@edx.org']
+            ['asd@edx.org', 'User', 'LastName1', 'LastName2', 'LASTNAME3', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4', 'LastName4'],
+            ['asd@edx.org'],
+            ['aux.student4@edx.org', 'LastNameP', 'LastNameM', 'User', 'P789456','10/10/2020','12345689', 'asd', 'asdasd'],
             ]
+        data_student_1 = '{};{};{}\r\n'.format(';'.join(array_csv[0]), self.student.username, 'Inscrito')
+        data_student_2 = '{};{};{}\r\n'.format(';'.join(array_csv[1]),'', 'EL correo esta asociado a otro rut')
+        data_student_3 = '{};{};{}\r\n'.format(';'.join(array_csv[2]),'user_lastnamep', 'Creado e Inscrito')
+        data_student_4 = '{};{};{}\r\n'.format(';'.join(array_csv[3]),'', 'Formato del correo incorrecto')
+        data_student_5 = '{};{};{}\r\n'.format(';'.join(array_csv[4]),'', 'Rut/Pasaporte invalido')
+        data_student_6 = '{};{};{}\r\n'.format(';'.join(array_csv[5]),'', 'Rut/Pasaporte invalido')
+        data_student_7 = '{};{}\r\n'.format(';'.join(array_csv[6][:-1]), 'Rut/Pasaporte invalido')
+        data_student_8 = '{};;;;;;;;{}\r\n'.format('asd@edx.org', 'Faltan datos')
+        data_student_9 = '{};{};{}\r\n'.format(';'.join(array_csv[8][:-2]),'user_lastnamep_l', 'Creado e Inscrito')
+        csv_reader.return_value = array_csv
         post_data = {
             "file": Mock(file=mock_file_object),
             'course': str(self.course.id),
@@ -140,16 +151,7 @@ class TestEnrollCSV(ModuleStoreTestCase):
         self.assertTrue(NAExtraInfo.objects.filter(na_rut='P123456').exists())
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        print(data)
-        data_student_1 = '{};{};{};{};{};{};{}\r\n'.format(self.student.email, 'a','b','c',na_user.na_rut,self.student.username, 'Inscrito')
-        data_student_2 = '{};{};{};{};{};{};{}\r\n'.format(self.student.email, 'a','b','c','PASDDAS','', 'EL correo esta asociado a otro rut')
-        data_student_3 = '{};{};{};{};{};{};{}\r\n'.format('aux.student2@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123456','user_lastnamep', 'Creado e Inscrito')
-        data_student_4 = '{};{};{};{};{};{};{}\r\n'.format('@edx.org', 'LastNameP', 'LastNameM', 'User', 'P789456','', 'Formato del correo incorrecto')
-        data_student_5 = '{};{};{};{};{};{};{}\r\n'.format('qwe@edx.org', 'LastNameP', 'LastNameM', 'User', '456789123','', 'Rut/Pasaporte invalido')
-        data_student_6 = '{};{};{};{};{};{};{}\r\n'.format('qwe@edx.org', 'LastNameP', 'LastNameM', 'User', 'P123123123123123123123132123453689','', 'Rut/Pasaporte invalido')
-        data_student_7 = '{};{};{};{};{};{};{}\r\n'.format('asd@edx.org', 'User', 'LastName1', 'LastName2', 'LastName3','', 'Esta fila no tiene 7 columnas')
-        data_student_8 = '{};{};{};{};{};{};{}\r\n'.format('asd@edx.org', '', '', '', '','', 'Esta fila no tiene 7 columnas')
-        expect = ['',"Email;Apellido Paterno;Apellido Materno;Nombres;RUT;Username;Estado\r\n", data_student_1, data_student_2, data_student_3, data_student_4, data_student_5, data_student_6, data_student_7, data_student_8]
+        expect = ['',"Email;Apellido Paterno;Apellido Materno;Nombres;RUT;Fecha de Nacimiento;Fono;Username;Estado\r\n", data_student_1, data_student_2, data_student_3, data_student_4, data_student_5, data_student_6, data_student_7, data_student_8, data_student_9]
         self.assertEqual(data, expect)
 
     @patch('norteamericanoapi.views.file_to_csvreader')

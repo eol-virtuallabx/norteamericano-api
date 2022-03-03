@@ -4,7 +4,7 @@
 <%inherit file="../base.html" />
 <%block name="title">Inscripción</%block>
 <%block name="content">
-<main id="main" aria-label="Content" tabindex="-1" class="static_pages">
+<main id="main" aria-label="Content" tabindex="-1" class="static_pages" style="background-color: #fff;padding: 30px;">
     <style>
 
         #main html, #main body {
@@ -27,6 +27,8 @@
             text-shadow: 0 1px rgba(255,255,255,0.4);
             -webkit-font-smoothing: antialiased;
             font-size: 100%;
+            width: 100px;
+            display: inline-block;
         }
         .form-group input[type="text"] {
             background: #fff;
@@ -60,43 +62,44 @@
             text-shadow: 0 -1px 1px #000042;
             font: normal 1.2rem/1.6rem "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
             letter-spacing: 1px;
-            padding: 4px 20px;
-            vertical-align: top;
             -webkit-font-smoothing: antialiased;
             font-size: 100%;
         }
     </style>
     <h1>Inscripción de Alumnos</h1>
-    <div style="text-align: center">
+    <div style="width: 520px;margin-left: auto;margin-right: auto;">
         % if context.get('errors', UNDEFINED) is not UNDEFINED:
             % if context['errors'].get('error_permission', UNDEFINED) is not UNDEFINED:
-                <p id="error_permission" style="color:firebrick; margin-bottom: 15px;">Usuario no tiene permisos suficientes.</p>
+                <p id="error_permission" style="color:firebrick; margin-bottom: 15px;text-align: center;">Usuario no tiene permisos suficientes.</p>
             % endif
             % if context['errors'].get('error_mode', UNDEFINED) is not UNDEFINED:
-                <p id="error_mode" style="color:firebrick; margin-bottom: 15px;">El modo esta incorrecto.</p>
+                <p id="error_mode" style="color:firebrick; margin-bottom: 15px;text-align: center;">El modo esta incorrecto.</p>
             % endif
             % if context['errors'].get('not_file', UNDEFINED) is not UNDEFINED:
-                <p id="not_file" style="color:firebrick; margin-bottom: 15px;">Falta agregar CSV.</p>
+                <p id="not_file" style="color:firebrick; margin-bottom: 15px;text-align: center;">Falta agregar CSV.</p>
             % endif
             % if context['errors'].get('not_course', UNDEFINED) is not UNDEFINED:
-                <p id="not_course" style="color:firebrick; margin-bottom: 15px;">Falta agregar curso.</p>
+                <p id="not_course" style="color:firebrick; margin-bottom: 15px;text-align: center;">Falta agregar curso.</p>
             % endif
             % if context['errors'].get('wrong_course', UNDEFINED) is not UNDEFINED:
-                <p id="wrong_course" style="color:firebrick; margin-bottom: 15px;">Id del curso no existe o es incorrecto.</p>
+                <p id="wrong_course" style="color:firebrick; margin-bottom: 15px;text-align: center;">Id del curso no existe o es incorrecto.</p>
             % endif
         % endif
         % if context.get('HAVE_NA_MODEL', False) is False:
-            <p id="HAVE_NA_MODEL" style="color:firebrick; margin-bottom: 15px;">Falta modelo, contactese con la mesa de ayuda de la plataforma.</p>
+            <p id="HAVE_NA_MODEL" style="color:firebrick; margin-bottom: 15px;text-align: center;">Falta modelo, contactese con la mesa de ayuda de la plataforma.</p>
         % endif
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrfmiddlewaretoken" value="${csrf_token}"/>
             <div class="form-group" style="margin: 15px 15px;">
                 <label for="course" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">ID Curso:</label>
-                <input type="text" name='course' id="course" placeholder="course-v1:mss+MSS001+2019_2" value='${curso}'></input>
+                <input type="text" name='course' id="course" placeholder="course-v1:mss+MSS001+2019_2" value='${curso}' style="width: 335px;"></input>
             </div>
             <div class="form-group" style="margin: 15px 15px;">
                 <label for="file" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">CSV:</label>
                 <input class="input setting-input" name="file" id="file" type="file" accept=".csv" />
+                <span style="display: block;text-align: center;"><a href="/norteamericano_api/enroll-export/" style="display: inline-block;margin-right: 78px;font-size: 80%;">
+                    Descargar planilla de ejemplo
+                </a></span>
             </div>
             <div class="form-group" style="margin: 15px 15px;">
                 <label for="mode" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Modo:</label>
@@ -110,11 +113,17 @@
                     % endif
                 </select>
             </div>
-            <a href="/norteamericano_api/enroll-export/" style="display: inline-flex;">
-            <button type="button">Exportar Planilla</button>
-            </a>
-            <input type="submit" style="height: 38px;text-shadow: none; border-color:white; background-color: #0075b4; background-image: none; display:inline-flex; margin: auto" value="Inscribir">
+            <div style="display: table;margin-left: auto;margin-right: auto;">
+                <input type="submit" style="height: 38px;text-shadow: none; border-color:white; background-color: #0075b4; background-image: none; display:inline-flex; margin: auto" value="Inscribir" onclick="show_message()">
+            </div>
+            <p id="enroll_message" style="color:rgb(56, 181, 197); margin-bottom: 15px;text-align: center;display: none;font-weight: bold;">La inscripción esta en proceso.</p>
         </form>
     </div>
+    <script type="text/javascript">
+        const show_message = function(){
+            let msg = document.getElementById('enroll_message');
+            msg.style.display = 'block';
+        };
+    </script>
 </main>
 </%block>

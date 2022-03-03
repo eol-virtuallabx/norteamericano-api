@@ -358,17 +358,19 @@ def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
     """
         Create and enroll the user
     """
-    new_data = [['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Username', 'Estado']]
+    new_data = [['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Fecha de Nacimiento', 'Fono', 'Username', 'Estado']]
     emails_data = []
     with transaction.atomic():
         for row in csv_data:
-            if len(row) != 7:
-                aux_row = ['','','','','','', 'Esta fila no tiene 7 columnas']
-                if len(row) < 7:
-                    new_data.append(row + aux_row[len(row):])
-                else:
-                    new_data.append(row[:5] + aux_row[-2:])
+            if len(row) < 7:
+                while len(row) < 7:
+                    row.append('')
+                new_data.append(row + ['', 'Faltan datos'])
                 continue
+            elif len(row) < 9:
+                while len(row) < 9:
+                    row.append('')
+
             row[0] = row[0].lower()
             row[4] = row[4].upper()
             row[4] = row[4].replace("-", "")
@@ -378,11 +380,8 @@ def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
             error = ''
             user_created = False
             if not validarRutAllType(row[4]):
-                aux_row = ['','','','','','', 'Rut/Pasaporte invalido']
-                if len(row) < 7:
-                    new_data.append(row + aux_row[len(row):])
-                else:
-                    new_data.append(row[:5] + aux_row[-2:])
+                row[-1] = 'Rut/Pasaporte invalido'
+                new_data.append(row)
                 continue
             if row[4][0] != 'P':
                 row[4] = '{}-{}'.format(row[4][:-1], row[4][-1])
@@ -415,22 +414,17 @@ def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
                     na_user = None
             if na_user:
                 enroll_course_user(na_user.user, course_id, mode)
-                new_data.append([
-                    row[0],row[1],row[2],row[3],row[4],
-                    na_user.user.username,
-                    'Inscrito' if aux_pass == '' else 'Creado e Inscrito'
-                ])
+                row[-2] = na_user.user.username
+                row[-1] = 'Inscrito' if aux_pass == '' else 'Creado e Inscrito'
+                new_data.append(row)
                 emails_data.append({
                     'email':row[0],
                     'user_name': na_user.user.profile.name.strip(),
                     'password': aux_pass
                 })
             else:
-                aux_row = ['','','','','','', error]
-                if len(row) < 7:
-                    new_data.append(row + aux_row[len(row):])
-                else:
-                    new_data.append(row[:5] + aux_row[-2:])
+                row[-1] = error
+                new_data.append(row)
     return {'new_data': new_data, 'emails_data': emails_data}
 
 def create_na_user(user_data, user):

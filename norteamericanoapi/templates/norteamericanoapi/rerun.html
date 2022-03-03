@@ -4,7 +4,7 @@
 <%inherit file="../base.html" />
 <%block name="title">ReRun</%block>
 <%block name="content">
-<main id="main" aria-label="Content" tabindex="-1" class="static_pages">
+<main id="main" aria-label="Content" tabindex="-1" class="static_pages" style="background-color: #fff;padding: 30px;">
 <style>
 #main html, #main body {
     font-family: "Open Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
@@ -72,10 +72,10 @@ form input[type="submit"], form input[type="button"]{
           <div class="form-group" style="margin: 15px 15px;">
               <label for="file" style="line-height: 33px; text-align: right; clear: both; margin-right: 15px; font-style: normal; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif">Archivo CSV:</label>
               <input class="input setting-input" name="file" id="file" type="file" accept=".csv" />
+              <span style="display: block;text-align: center;"><a href="/norteamericano_api/rerun-export/" style="display: inline-block;margin-right: 45px;font-size: 80%;">
+                Descargar planilla de ejemplo
+            </a></span>
           </div>
-          <a href="/norteamericano_api/rerun-export/" style="display: inline-flex;">
-            <button type="button">Exportar Planilla</button>
-          </a>
           <input type="submit" style="height: 38px;text-shadow: none; border-color:white; background-color: #0075b4; background-image: none; display:inline-flex; margin: auto" value="ReRun">
       </form>
   </div>
