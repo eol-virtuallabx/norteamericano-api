@@ -64,7 +64,7 @@ form input[type="submit"], form input[type="button"]{
     <div style="text-align: center">
         % if context.get('errors', UNDEFINED) is not UNDEFINED:
             % if context['errors'].get('not_file', UNDEFINED) is not UNDEFINED:
-                <p id="not_file" style="color:firebrick; margin-bottom: 15px;">Falta agregar CSV.</p>
+                <p id="not_file" style="color:firebrick; margin-bottom: 15px;text-align: center;">Falta agregar CSV.</p>
             % endif
         % endif
       <form method="POST" enctype="multipart/form-data">
