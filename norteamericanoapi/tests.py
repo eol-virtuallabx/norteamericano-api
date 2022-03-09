@@ -502,19 +502,18 @@ class TestReRun(ModuleStoreTestCase):
         """
             test rerun courses POST method
         """
-        mongo_course1_id = self.course.id
-
         # rerun from mongo into split
         split_course3_id = CourseLocator(
             org="edx3", course="split3", run="rerun_test"
         )
         # Mark the action as initiated
         fields = {'display_name': 'rerun'}
-        CourseRerunState.objects.initiated(mongo_course1_id, split_course3_id, self.user, fields['display_name'])
+        CourseRerunState.objects.initiated(self.course.id, split_course3_id, self.user, fields['display_name'])
 
-        csv_reader.return_value = [
-            [str(mongo_course1_id), str(split_course3_id), fields['display_name']]
-            ]
+        data_csv = [str(self.course.id), str(split_course3_id), fields['display_name'], '15:00 25/12/2022','15:00 25/12/2023']
+
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'Procesandose')
+        csv_reader.return_value = [data_csv]
         mock_file_object = Mock()
         mock_file_object.configure_mock(name="file_name")
         post_data = {
@@ -526,8 +525,7 @@ class TestReRun(ModuleStoreTestCase):
         rerun_state = CourseRerunState.objects.find_first(course_key=split_course3_id)
         self.assertEqual(rerun_state.state, CourseRerunUIStateManager.State.SUCCEEDED)
         data = [x.decode() for x in response._container]
-        aux = '{};{};{};{}\r\n'.format(str(mongo_course1_id), str(split_course3_id), fields['display_name'], 'Procesandose')
-        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Estado\r\n', aux]
+        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
         self.assertEqual(data, expect)
 
     @patch('norteamericanoapi.views.file_to_csvreader')
@@ -541,9 +539,9 @@ class TestReRun(ModuleStoreTestCase):
         )
         # Mark the action as initiated
         fields = {'display_name': 'rerun'}
-        csv_reader.return_value = [
-            ['asdsadsad', str(split_course3_id), fields['display_name']]
-            ]
+        data_csv = [str(self.course.id), str(split_course3_id), fields['display_name'], '15:00 25-12-2022','15:00 25/12/2023']
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'Formato incorrecto en las fechas del curso')
+        csv_reader.return_value = [data_csv]
         mock_file_object = Mock()
         mock_file_object.configure_mock(name="file_name")
         post_data = {
@@ -552,8 +550,32 @@ class TestReRun(ModuleStoreTestCase):
         response = self.client.post(reverse('norteamericanoapi:rerun'), post_data)
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        aux = '{};{};{};{}\r\n'.format('asdsadsad', str(split_course3_id), fields['display_name'], 'Formato del course_id incorrecto o el curso no existe')
-        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Estado\r\n', aux]
+        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
+        self.assertEqual(data, expect)
+    
+    @patch('norteamericanoapi.views.file_to_csvreader')
+    def test_rerun_wrong_datetime(self, csv_reader):
+        """
+            test rerun courses when start_date or end_date are wrong
+        """
+        # rerun from mongo into split
+        split_course3_id = CourseLocator(
+            org="edx3", course="split3", run="rerun_test"
+        )
+        # Mark the action as initiated
+        fields = {'display_name': 'rerun'}
+        data_csv = ['asdsadsad', str(split_course3_id), fields['display_name'], '15:00 25/12/2022','15:00 25/12/2023']
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'Formato del course_id incorrecto o el curso no existe')
+        csv_reader.return_value = [data_csv]
+        mock_file_object = Mock()
+        mock_file_object.configure_mock(name="file_name")
+        post_data = {
+            "file": Mock(file=mock_file_object),
+        }
+        response = self.client.post(reverse('norteamericanoapi:rerun'), post_data)
+        self.assertEqual(response.status_code, 200)
+        data = [x.decode() for x in response._container]
+        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
         self.assertEqual(data, expect)
     
     @patch('norteamericanoapi.views.file_to_csvreader')
@@ -563,9 +585,9 @@ class TestReRun(ModuleStoreTestCase):
         """
         # Mark the action as initiated
         fields = {'display_name': 'rerun'}
-        csv_reader.return_value = [
-            [str(self.course.id), str(self.course.id), fields['display_name']]
-            ]
+        data_csv = [str(self.course.id), str(self.course.id), fields['display_name'], '15:00 25/12/2022','15:00 25/12/2023']
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'El nuevo course id ya existe o formato de course id incorrecto')
+        csv_reader.return_value = [data_csv]
         mock_file_object = Mock()
         mock_file_object.configure_mock(name="file_name")
         post_data = {
@@ -574,8 +596,7 @@ class TestReRun(ModuleStoreTestCase):
         response = self.client.post(reverse('norteamericanoapi:rerun'), post_data)
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        aux = '{};{};{};{}\r\n'.format(str(self.course.id), str(self.course.id), fields['display_name'], 'El nuevo course id ya existe o formato de course id incorrecto')
-        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Estado\r\n', aux]
+        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
         self.assertEqual(data, expect)
 
     @patch('norteamericanoapi.views.file_to_csvreader')
@@ -589,9 +610,9 @@ class TestReRun(ModuleStoreTestCase):
         )
         # Mark the action as initiated
         fields = {'display_name': 'rerun'}
-        csv_reader.return_value = [
-            [str(self.course.id), str(split_course3_id), fields['display_name']]
-            ]
+        data_csv = [str(self.course.id), str(split_course3_id), fields['display_name'], '15:00 25/12/2022','15:00 25/12/2023']
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'Usuario no tiene permisos en el curso')
+        csv_reader.return_value = [data_csv]
         mock_file_object = Mock()
         mock_file_object.configure_mock(name="file_name")
         post_data = {
@@ -600,8 +621,7 @@ class TestReRun(ModuleStoreTestCase):
         response = self.student_client.post(reverse('norteamericanoapi:rerun'), post_data)
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        aux = '{};{};{};{}\r\n'.format(str(self.course.id), str(split_course3_id), fields['display_name'], 'Usuario no tiene permisos en el curso')
-        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Estado\r\n', aux]
+        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
         self.assertEqual(data, expect)
 
 class TestReRunExportCSV(ModuleStoreTestCase):
@@ -630,7 +650,7 @@ class TestReRunExportCSV(ModuleStoreTestCase):
         response = self.client.get(reverse('norteamericanoapi:rerun-export'))
         self.assertEqual(response.status_code, 200)
         data = [x.decode() for x in response._container]
-        expect = ['',"Course Id;Nuevo Course Id;Nombre curso nuevo\r\n"]
+        expect = ['',"Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC)\r\n"]
         self.assertEqual(data, expect)
 
         new_client = Client()

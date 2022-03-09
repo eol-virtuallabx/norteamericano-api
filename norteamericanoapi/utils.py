@@ -19,6 +19,7 @@ from common.djangoapps.course_action_state.models import CourseRerunState
 from xmodule.modulestore import EdxJSONEncoder
 from xmodule.course_module import DEFAULT_START_DATE, CourseFields
 from lms.djangoapps.courseware.access import has_access
+from datetime import datetime as dt
 import unidecode
 import logging
 import json
@@ -207,7 +208,7 @@ def validate_user(user, course_id):
         Verify if the user have permission
     """
     access = False
-    if not user.is_anonymous:
+    if not user.is_anonymous and user.has_perm('norteamericano_form.na_instructor_staff'):
         if user.is_staff:
             access = True
         if is_instructor(user, course_id):
@@ -447,22 +448,38 @@ def rerun_courses(csv_data, user):
     """
         ReRun Courses from CSV file
     """
-    new_data = [['Course Id', 'Nuevo Course Id', 'Nombre curso nuevo', 'Estado']]
+    new_data = [['Course Id', 'Nuevo Course Id', 'Nombre curso nuevo', 'Fecha de Inicio(UTC)', 'Fecha de Termino(UTC)', 'Estado']]
     for course_ids in csv_data:
+        if len(course_ids) < 5:
+            while len(course_ids) < 5:
+                course_ids.append('')
+            new_data.append(course_ids + ['Faltan datos'])
+            continue
+        if len(course_ids) < 6:
+            course_ids.append('')
         if not validate_course(course_ids[0]):
-            new_data.append([course_ids[0], course_ids[1], course_ids[2], 'Formato del course_id incorrecto o el curso no existe'])
+            course_ids[5] = 'Formato del course_id incorrecto o el curso no existe'
+            new_data.append(course_ids)
         elif validate_course(course_ids[1]):
-            new_data.append([course_ids[0], course_ids[1], course_ids[2],'El nuevo course id ya existe o formato de course id incorrecto'])
+            course_ids[5] = 'El nuevo course id ya existe o formato de course id incorrecto'
+            new_data.append(course_ids)
         elif not validate_user(user, course_ids[0]):
-            new_data.append([course_ids[0], course_ids[1], course_ids[2],'Usuario no tiene permisos en el curso'])
+            course_ids[5] = 'Usuario no tiene permisos en el curso'
+            new_data.append(course_ids)
         else:
+            try:
+                start_date = dt.strptime(course_ids[3]+' +0000', "%H:%M %d/%m/%Y %z")
+                end_date = dt.strptime(course_ids[4]+' +0000', "%H:%M %d/%m/%Y %z")
+            except ValueError:
+                course_ids[5] = 'Formato incorrecto en las fechas del curso'
+                new_data.append(course_ids)
+                continue
             new_course_key = CourseKey.from_string(course_ids[1])
             org = new_course_key.org
             number = new_course_key.course
             run = new_course_key.run
             display_name = course_ids[2]
-            start = CourseFields.start.default
-            fields = {'start': start}
+            fields = {'start': start_date, 'end':end_date}
             if display_name:
                 fields['display_name'] = display_name
 
@@ -476,10 +493,10 @@ def rerun_courses(csv_data, user):
             except Exception as e:
                 logger.error('NorteamericanoReRun - Error in rerun_course(): {}'.format(str(e)))
                 new_course_id = None
-            aux_data = [course_ids[0], course_ids[1], course_ids[2],'Procesandose']
+            course_ids[5] = 'Procesandose'
             if not new_course_id:
-                aux_data[-1] = 'Error en relanzar el curso'
-            new_data.append(aux_data)
+                course_ids[5] = 'Error en relanzar el curso'
+            new_data.append(course_ids)
     return new_data
 
 def validarRut(rut):

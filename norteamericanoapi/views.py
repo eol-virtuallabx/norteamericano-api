@@ -177,7 +177,7 @@ class NorteamericanoReRunExport(View):
                 response,
                 delimiter=';',
                 dialect='excel')
-            writer.writerow(['Course Id', 'Nuevo Course Id', 'Nombre curso nuevo'])
+            writer.writerow(['Course Id', 'Nuevo Course Id', 'Nombre curso nuevo', 'Fecha de Inicio(UTC)', 'Fecha de Termino(UTC)'])
             return response
         else:
             logger.error("NorteamericanoReRunExport - User is Anonymous")
