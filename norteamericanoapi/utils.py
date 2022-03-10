@@ -217,123 +217,6 @@ def validate_user(user, course_id):
             access = True
     return access
 
-def validate_data(user, lista_data, course_ids, mode):
-    """
-        Validate Data enroll users
-    """
-    response = {}
-    wrong_data = []
-    duplicate_data = []
-    original_data = []
-    duplicate_courses = []
-    original_courses = []
-    # si no se ingreso datos
-    if not lista_data:
-        logger.error("NorteamericanoAPI - Empty Data, user: {}".format(user.id))
-        response['empty_data'] = True
-    elif type(lista_data) != list:
-        logger.error("NorteamericanoAPI - error data users, user: {}".format(user.id))
-        response['error_type_users'] = True
-    else:
-        for data in lista_data:
-            try:
-                if len(data) != 2:
-                    wrong_data.append(data)
-                    logger.error("NorteamericanoAPI - Wrong Data, parameters length != 2, user: {}, wrong_data: {}".format(user.id, data))
-                else:
-                    if data[0] != "" and data[1] != "":
-                        aux_name = unidecode.unidecode(data[0].lower())
-                        #aux_name = re.sub(r'[^a-zA-Z0-9\_]', ' ', aux_name)
-                        if not re.match(regex_names, aux_name):
-                            logger.error("NorteamericanoAPI - Wrong Name, not allowed specials characters, user: {}, wrong_data: {}".format(user.id, data))
-                            wrong_data.append(data)
-                        elif not re.match(regex, data[1].lower()):
-                            logger.error("NorteamericanoAPI - Wrong Email {}, user: {}, wrong_data: {}".format(data[1].lower(), user.id, data))
-                            wrong_data.append(data)
-                        elif data[1] in original_data:
-                            duplicate_data.append(data[1])
-                        else:
-                            original_data.append(data[1])
-                    else:
-                        wrong_data.append(data)
-            except TypeError as e:
-                wrong_data.append(data)
-                logger.error("NorteamericanoAPI - TypeError Data, user: {}, wrong_data: {}".format(user.id, data))
-    if len(wrong_data) > 0:
-        logger.error("NorteamericanoAPI - Wrong Data, user: {}, wrong_data: {}".format(user.id, wrong_data))
-        response['wrong_data'] = wrong_data
-    if len(duplicate_data) > 0:
-        logger.error("NorteamericanoAPI - Duplicate Email, user: {}, duplicate_data: {}".format(user.id, duplicate_data))
-        response['duplicate_email'] = duplicate_data
-    # valida curso
-    if len(course_ids) == 0:
-        logger.error("NorteamericanoAPI - Empty course, user: {}".format(user.id))
-        response['empty_course'] = True
-    elif type(course_ids) != list:
-        logger.error("NorteamericanoAPI - error data course, user: {}".format(user.id))
-        response['error_type_course'] = True
-    # valida si existe el curso
-    else:
-        for course_id in course_ids:
-            if course_id in original_courses:
-                duplicate_courses.append(course_id)
-            else:
-                original_courses.append(course_id)
-            if not validate_course(course_id):
-                if 'error_curso' not in response:
-                    response['error_curso'] = [course_id]
-                else:
-                    response['error_curso'].append(course_id)
-                logger.error("NorteamericanoAPI - Course dont exists, user: {}, course_id: {}".format(user.id, course_id))
-        if 'error_curso' not in response:
-            for course_id in course_ids:
-                if not validate_user(user, course_id):
-                    if 'error_permission' not in response:
-                        response['error_permission'] = [course_id]
-                    else:
-                        response['error_permission'].append(course_id)
-                    logger.error("NorteamericanoAPI - User dont have permission, user: {}, course_id: {}".format(user.id, course_id))
-    if len(duplicate_courses) > 0:
-        response['duplicate_courses'] = duplicate_courses
-    # si el modo es incorrecto
-    if mode not in ['honor', 'audit']:
-        response['error_mode'] = True
-        logger.error("NorteamericanoAPI - Wrong Mode, user: {}, mode: {}".format(user.id, mode))
-    return response
-
-def enroll_create_user_api(course_ids, mode, lista_data):
-    """
-        Create and enroll the user from api
-    """
-    lista_saved = []
-    # guarda el form
-    with transaction.atomic():
-        for dato in lista_data:
-            dato = [d.strip() for d in dato]
-            dato[1] = dato[1].lower()
-            aux_pass = ''
-            aux_user = False
-            try:
-                user = User.objects.get(email=aux_email)
-                aux_user = True
-            except User.DoesNotExist:
-                aux_pass = BaseUserManager().make_random_password(12).lower()
-                user_data = {
-                    'email':dato[1],
-                    'nombreCompleto':dato[0],
-                    'pass': aux_pass
-                }
-                user = create_user_by_data(user_data)
-            for course_id in course_ids:
-                enroll_course_user(user, course_id, mode)
-            lista_saved.append({
-                'email': dato[1],
-                'user_name': user.profile.name.strip(),
-                'password': aux_pass,
-                'exists': aux_user
-            })
-    return lista_saved
-
 def enroll_course_user(user, course, mode):
     """
         Enroll the user in the course.
@@ -355,21 +238,22 @@ def file_to_csvreader(csvfile):
     header = next(csv_reader)
     return csv_reader
 
-def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
+def enroll_create_user_with_custom_fields(csv_data, mode):
     """
         Create and enroll the user
     """
-    new_data = [['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Fecha de Nacimiento', 'Fono', 'Username', 'Estado']]
+    new_data = [['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Fecha de Nacimiento', 'Fono', 'Id curso', 'Username', 'Estado']]
     emails_data = []
+    courses = {}
     with transaction.atomic():
         for row in csv_data:
-            if len(row) < 7:
-                while len(row) < 7:
+            if len(row) < 8:
+                while len(row) < 8:
                     row.append('')
                 new_data.append(row + ['', 'Faltan datos'])
                 continue
-            elif len(row) < 9:
-                while len(row) < 9:
+            elif len(row) < 10:
+                while len(row) < 10:
                     row.append('')
 
             row[0] = row[0].lower()
@@ -386,6 +270,10 @@ def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
                 continue
             if row[4][0] != 'P':
                 row[4] = '{}-{}'.format(row[4][:-1], row[4][-1])
+            if not validate_course(row[7]):
+                row[-1] = 'Id curso invalido o curso no existe'
+                new_data.append(row)
+                continue
             if NAExtraInfo.objects.filter(na_rut=row[4]).exists():
                 na_user = NAExtraInfo.objects.get(na_rut=row[4])
             else:
@@ -414,14 +302,21 @@ def enroll_create_user_with_custom_fields(csv_data, course_id, mode):
                 else:
                     na_user = None
             if na_user:
-                enroll_course_user(na_user.user, course_id, mode)
+                enroll_course_user(na_user.user, row[7], mode)
                 row[-2] = na_user.user.username
                 row[-1] = 'Inscrito' if aux_pass == '' else 'Creado e Inscrito'
                 new_data.append(row)
+                if row[7] in courses:
+                    course_name = courses[row[7]]
+                else:
+                    course = get_course_by_id(CourseKey.from_string(row[7]))
+                    course_name = course.display_name_with_default
+                    courses[row[7]] = course_name
                 emails_data.append({
                     'email':row[0],
                     'user_name': na_user.user.profile.name.strip(),
-                    'password': aux_pass
+                    'password': aux_pass,
+                    'course_name': course_name
                 })
             else:
                 row[-1] = error

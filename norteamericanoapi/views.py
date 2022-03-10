@@ -15,7 +15,6 @@ import logging
 import json
 import csv
 from opaque_keys.edx.keys import CourseKey
-from lms.djangoapps.courseware.courses import get_course_by_id
 from common.djangoapps.util.json_request import JsonResponse, JsonResponseBadRequest
 
 logger = logging.getLogger(__name__)
@@ -26,7 +25,7 @@ class NorteamericanoEnroll(View):
     """
     def get(self, request):
         if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
-            context = {'modo': 'honor', 'curso':'', 'HAVE_NA_MODEL': HAVE_NA_MODEL}
+            context = {'modo': 'honor', 'HAVE_NA_MODEL': HAVE_NA_MODEL}
             return render_to_response('norteamericanoapi/enroll.html', context)
         else:
             logger.error("NorteamericanoEnroll - User is Anonymous")
@@ -35,9 +34,9 @@ class NorteamericanoEnroll(View):
     def post(self, request):
         """
             csv file first column is email
-            [[email@email.com, lastnames_1, lastname_2, names, rut, birthday, phone],...]
+            [[email@email.com, lastnames_1, lastname_2, names, rut, birthday, phone, course_id],...]
         """
-        context = {'result': 'success', 'modo': request.POST.get('mode', ''), 'curso':request.POST.get('course', ''), 'HAVE_NA_MODEL': HAVE_NA_MODEL}
+        context = {'result': 'success', 'modo': request.POST.get('mode', ''), 'HAVE_NA_MODEL': HAVE_NA_MODEL}
         if HAVE_NA_MODEL is False:
             return render_to_response('norteamericanoapi/enroll.html', context)
         if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
@@ -48,16 +47,13 @@ class NorteamericanoEnroll(View):
                 return render_to_response('norteamericanoapi/enroll.html', context)
             csv_reader = file_to_csvreader(request.FILES.get('file').file)
             csv_data = [x for x in csv_reader]
-            data = enroll_create_user_with_custom_fields(csv_data, request.POST.get('course'), request.POST.get('mode'))
+            data = enroll_create_user_with_custom_fields(csv_data, request.POST.get('mode'))
             
             login_url = request.build_absolute_uri('/login')
-            course = get_course_by_id(CourseKey.from_string(request.POST.get('course'))) 
-            courses_name = course.display_name_with_default
             for email in data['emails_data']:
-                enroll_email.delay(email, courses_name, login_url)
-
+                enroll_email.delay(email, login_url)
             response = HttpResponse(content_type='text/csv')
-            response['Content-Disposition'] = 'attachment; filename="enroll_{}.csv"'.format(request.POST.get('course'))
+            response['Content-Disposition'] = 'attachment; filename="enroll_resumen.csv"'
             writer = csv.writer(
                 response,
                 delimiter=';',
@@ -73,15 +69,9 @@ class NorteamericanoEnroll(View):
         if request.FILES.get('file', None) is None or not hasattr(request.FILES.get('file'), "file"):
             logger.error('NorteamericanoEnroll - Error, request dont have csv file: {}'.format(request.POST))
             response['not_file'] = True
-        if request.POST.get('course', '') == '':
-            logger.error('NorteamericanoEnroll - Error, request dont have course_id: {}'.format(request.POST))
-            response['not_course'] = True
-        elif not validate_course(request.POST.get('course')):
-            logger.error('NorteamericanoEnroll - Error, wrong course_id or dont exists, course_id: {}'.format(request.POST.get('course')))
-            response['wrong_course'] = True
-        elif not validate_user(request.user, request.POST.get('course')):
+        if not request.user.has_perm('norteamericano_form.na_instructor_staff'):
             response['error_permission'] = True
-            logger.error("NorteamericanoEnroll - User dont have permission, user: {}, course_id: {}".format(request.user, request.POST.get('course')))
+            logger.error("NorteamericanoEnroll - User dont have permission, user: {}".format(request.user))
         if request.POST.get('mode', '') not in ['honor', 'audit']:
             response['error_mode'] = True
             logger.error("NorteamericanoEnroll - Wrong Mode, user: {}, mode: {}".format(request.user, request.POST.get('mode')))
@@ -101,7 +91,7 @@ class NorteamericanoEnrollExport(View):
                 response,
                 delimiter=';',
                 dialect='excel')
-            writer.writerow(['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Fecha de Nacimiento', 'Fono'])
+            writer.writerow(['Email', 'Apellido Paterno', 'Apellido Materno', 'Nombres', 'RUT', 'Fecha de Nacimiento', 'Fono', 'Id Curso'])
             return response
         else:
             logger.error("NorteamericanoEnrollExport - User is Anonymous")

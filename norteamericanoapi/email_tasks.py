@@ -18,15 +18,15 @@ EMAIL_MAX_RETRIES = 5
     queue='edx.lms.core.low',
     default_retry_delay=EMAIL_DEFAULT_RETRY_DELAY,
     max_retries=EMAIL_MAX_RETRIES)
-def enroll_email(data, courses_name, login_url):
+def enroll_email(data, login_url):
     """
         Send mail to specific user
     """
     platform_name = configuration_helpers.get_value(
             'PLATFORM_NAME', settings.PLATFORM_NAME)
-    subject = 'Inscripción en el(los) curso(s): {}'.format(courses_name)
+    subject = 'Inscripción en el curso: {}'.format(data['course_name'])
     context = {
-        "courses_name": courses_name,
+        "course_name": data['course_name'],
         "platform_name": platform_name,
         "user_password": data['password'],
         'user_email': data['email'],
