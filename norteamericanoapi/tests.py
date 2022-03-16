@@ -501,9 +501,9 @@ class TestReRun(ModuleStoreTestCase):
         self.assertEqual(data, expect)
 
     @patch('norteamericanoapi.views.file_to_csvreader')
-    def test_rerun_wrong_course_id(self, csv_reader):
+    def test_rerun_wrong_datetime(self, csv_reader):
         """
-            test rerun courses when origin course id is wrong
+            test rerun courses when start_date or end_date are wrong
         """
         # rerun from mongo into split
         split_course3_id = CourseLocator(
@@ -526,9 +526,9 @@ class TestReRun(ModuleStoreTestCase):
         self.assertEqual(data, expect)
     
     @patch('norteamericanoapi.views.file_to_csvreader')
-    def test_rerun_wrong_datetime(self, csv_reader):
+    def test_rerun_wrong_course_id(self, csv_reader):
         """
-            test rerun courses when start_date or end_date are wrong
+            test rerun courses when origin course id is wrong
         """
         # rerun from mongo into split
         split_course3_id = CourseLocator(
@@ -557,8 +557,29 @@ class TestReRun(ModuleStoreTestCase):
         """
         # Mark the action as initiated
         fields = {'display_name': 'rerun'}
+        data_csv = [str(self.course.id), 'course-v2:eol+Test202+2022_2', fields['display_name'], '15:00 25/12/2022','15:00 25/12/2023']
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'Formato del nuevo course_id incorrecto')
+        csv_reader.return_value = [data_csv]
+        mock_file_object = Mock()
+        mock_file_object.configure_mock(name="file_name")
+        post_data = {
+            "file": Mock(file=mock_file_object),
+        }
+        response = self.client.post(reverse('norteamericanoapi:rerun'), post_data)
+        self.assertEqual(response.status_code, 200)
+        data = [x.decode() for x in response._container]
+        expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
+        self.assertEqual(data, expect)
+    
+    @patch('norteamericanoapi.views.file_to_csvreader')
+    def test_rerun_wrong_new_course_id_2(self, csv_reader):
+        """
+            test rerun courses wwhen new course id is wrong
+        """
+        # Mark the action as initiated
+        fields = {'display_name': 'rerun'}
         data_csv = [str(self.course.id), str(self.course.id), fields['display_name'], '15:00 25/12/2022','15:00 25/12/2023']
-        aux = '{};{}\r\n'.format(';'.join(data_csv), 'El nuevo course id ya existe o formato de course id incorrecto')
+        aux = '{};{}\r\n'.format(';'.join(data_csv), 'El nuevo course id ya existe')
         csv_reader.return_value = [data_csv]
         mock_file_object = Mock()
         mock_file_object.configure_mock(name="file_name")

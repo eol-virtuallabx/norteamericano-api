@@ -352,11 +352,18 @@ def rerun_courses(csv_data, user):
             continue
         if len(course_ids) < 6:
             course_ids.append('')
+        try:
+            aux = CourseKey.from_string(course_ids[1])
+        except InvalidKeyError:
+            logger.error("Norteamericano error format course_id, invalid format: {}".format(course_ids[1]))
+            course_ids[5] = 'Formato del nuevo course_id incorrecto'
+            new_data.append(course_ids)
+            continue
         if not validate_course(course_ids[0]):
             course_ids[5] = 'Formato del course_id incorrecto o el curso no existe'
             new_data.append(course_ids)
         elif validate_course(course_ids[1]):
-            course_ids[5] = 'El nuevo course id ya existe o formato de course id incorrecto'
+            course_ids[5] = 'El nuevo course id ya existe'
             new_data.append(course_ids)
         elif not validate_user(user, course_ids[0]):
             course_ids[5] = 'Usuario no tiene permisos en el curso'
