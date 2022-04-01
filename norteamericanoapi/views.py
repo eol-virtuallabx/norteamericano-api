@@ -49,7 +49,7 @@ class NorteamericanoEnroll(View):
             csv_data = [x for x in csv_reader]
             data = enroll_create_user_with_custom_fields(csv_data, request.POST.get('mode'))
             
-            login_url = request.build_absolute_uri('/login')
+            login_url = 'https://{}/login'.format(settings.LMS_BASE)
             for email in data['emails_data']:
                 enroll_email.delay(email, login_url)
             response = HttpResponse(content_type='text/csv')

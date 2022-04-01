@@ -179,6 +179,18 @@ def validate_course(id_curso):
         logger.error("Norteamericano error valdiate course, invalid format: {}".format(id_curso))
         return False
 
+def validate_course_pending_course(course_id):
+    """
+        Validate if course id exists in pending rerun
+    """
+    from common.djangoapps.course_action_state.models import CourseRerunState
+    try:
+        aux = CourseKey.from_string(course_id)
+        return CourseRerunState.objects.filter(course_key=aux).exists()
+    except InvalidKeyError:
+        logger.error("Norteamericano error validate_course_pending_course, invalid format: {}".format(course_id))
+        return False
+
 def is_course_staff(user, course_id):
     """
         Verify if the user is staff course

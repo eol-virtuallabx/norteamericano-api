@@ -4,7 +4,6 @@ from mock import patch, Mock, MagicMock
 from collections import namedtuple
 from django.urls import reverse
 from django.test import TestCase, Client
-from django.test import Client
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -21,6 +20,8 @@ from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRol
 from common.djangoapps.course_action_state.models import CourseRerunState
 from common.djangoapps.course_action_state.managers import CourseRerunUIStateManager
 from .utils import create_user_by_data, generate_username
+from .rest_api import EnrollApi, UnenrollApi, ReRunPendingCourseApi, ReRunApi
+from .serializers import EnrollSerializer, UnEnrollSerializer, ReRunPendingCourseSerializer, ReRunSerializer
 from django.test.utils import override_settings
 from unittest.case import SkipTest
 import re
@@ -305,6 +306,254 @@ class TestEnrollCSV(ModuleStoreTestCase):
         response = new_client.get(reverse('norteamericanoapi:enroll'))
         self.assertEqual(response.status_code, 404)
 
+class TestEnrollSerializers(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestEnrollSerializers, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+
+    def test_enroll_serializers(self):
+        """
+            Test enroll serializers
+        """
+        body = {
+            "email":'student2@edx.org',
+            "lastname_1":"asdasd",
+            "lastname_2":"asdasdasd",
+            "names":"ASdsads",
+            "rut":'P012345',
+            "birthday":"12/12/1212",
+            "phone":"1234578",
+            "course":str(self.course.id),
+            "mode":'honor'
+        }
+        serializer = EnrollSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_enroll_serializers_not_valid(self):
+        """
+            test enroll serializers when is not valid
+        """
+        body = {
+            "email":'student2@edx@g',
+            "lastname_1":"asdasd",
+            "lastname_2":"asdasdasd",
+            "names":"ASdsads",
+            "rut":'34324sdf',
+            "birthday":"12/12/1212",
+            "phone":"",
+            "course":'course-v1:eol+Test202v2+2022',
+            "mode":'asdad'
+        }
+        serializer = EnrollSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 5)
+        self.assertEqual(str(serializer.errors['email'][0]), "'Email invalid': {}".format(body["email"]))
+        self.assertEqual(str(serializer.errors['rut'][0]), "'Rut/Passport invalid': {}".format(body['rut']))
+        self.assertEqual(str(serializer.errors['mode'][0]), '"{}" is not a valid choice.'.format(body['mode']))
+        self.assertEqual(str(serializer.errors['course'][0]), "Course key not valid or dont exists: {}".format(body['course']))
+        self.assertEqual(str(serializer.errors['phone'][0]), 'This field may not be blank.')
+
+class TestEnrollAPI(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestEnrollAPI, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            self.student = UserFactory(
+                username='student',
+                password='12345',
+                email='student@edx.org')
+            self.student_2 = UserFactory(
+                username='student2',
+                password='12345',
+                email='student2@edx.org')
+        na_user = NAExtraInfo.objects.create(
+            user=self.student,
+            na_names='names',
+            na_lastname_p='father lastname',
+            na_lastname_m='mother lastname',
+            na_rut='11111111-1',
+            na_birth_date='10/10/2020',
+            na_phone='123456789'
+        )
+        
+
+    @override_settings(REGISTRATION_EMAIL_PATTERNS_DISALLOWED=True)
+    def test_enroll_api(self):
+        """
+            Test enroll api
+        """
+        #new user
+        body = {
+            "email":'student555@edx.org',
+            "lastname_1":"asdasd",
+            "lastname_2":"asdasdasd",
+            "names":"ASdsads",
+            "rut":'P012345',
+            "birthday":"12/12/1212",
+            "phone":"1234578",
+            "course":str(self.course.id),
+            "mode":'honor'
+        }
+        response = EnrollApi().create_enroll_user(body, 'https://test.web.st/login')
+        self.assertEqual(response, 'success')
+        aux_na_user = NAExtraInfo.objects.get(na_rut='P012345')
+        self.assertEqual(aux_na_user.user.email, body['email'])
+        #exists user
+        body = {
+            "email":self.student.email,
+            "lastname_1":"asdasd",
+            "lastname_2":"asdasdasd",
+            "names":"ASdsads",
+            "rut":'11111111-1',
+            "birthday":"12/12/1212",
+            "phone":"1234578",
+            "course":str(self.course.id),
+            "mode":'honor'
+        }
+        response = EnrollApi().create_enroll_user(body, 'https://test.web.st/login')
+        self.assertEqual(response, 'success')
+        #exists user bt not na user
+        body = {
+            "email":self.student_2.email,
+            "lastname_1":"asdasd",
+            "lastname_2":"asdasdasd",
+            "names":"ASdsads",
+            "rut":'P111111111',
+            "birthday":"12/12/1212",
+            "phone":"1234578",
+            "course":str(self.course.id),
+            "mode":'honor'
+        }
+        response = EnrollApi().create_enroll_user(body, 'https://test.web.st/login')
+        self.assertEqual(response, 'success')
+        aux_na_user = NAExtraInfo.objects.get(na_rut='P111111111')
+        self.assertEqual(aux_na_user.user.email, body['email'])
+
+    def test_api_error(self):
+        """
+            test enroll api error
+        """
+        na_user2 = NAExtraInfo.objects.create(
+            user=self.student_2,
+            na_names='names',
+            na_lastname_p='father lastname',
+            na_lastname_m='mother lastname',
+            na_rut='Pasdsadsad',
+            na_birth_date='10/10/2020',
+            na_phone='123456789'
+        )
+        body = {
+            "email":self.student_2.email,
+            "lastname_1":"asdasd",
+            "lastname_2":"asdasdasd",
+            "names":"ASdsads",
+            "rut":'P111111111asdasdsa',
+            "birthday":"12/12/1212",
+            "phone":"",
+            "course":str(self.course.id),
+            "mode":'asdad'
+        }
+        response = EnrollApi().create_enroll_user(body, 'https://test.web.st/login')
+        self.assertEqual(response, 'EL correo esta asociado a otro rut')
+
+class TestUnenrollSerializers(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestUnenrollSerializers, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            self.student = UserFactory(
+                username='student',
+                password='12345',
+                email='student@edx.org')
+
+    def test_unenroll_serializers(self):
+        """
+            Test unenroll serializers
+        """
+        na_user = NAExtraInfo.objects.create(
+            user=self.student,
+            na_names='names',
+            na_lastname_p='father lastname',
+            na_lastname_m='mother lastname',
+            na_rut='P123456789',
+            na_birth_date='10/10/2020',
+            na_phone='123456789'
+        )
+        body = {
+            "rut":na_user.na_rut,
+            "course":str(self.course.id)
+        }
+        serializer = UnEnrollSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_unenroll_serializers_not_valid(self):
+        """
+            test unenoll serializers when is not valid       
+        """
+        body = {
+            "rut":'P23456789',
+            "course":'course-v1:eol+Test202v2 2022'
+        }
+        serializer = UnEnrollSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 2)
+        self.assertEqual(str(serializer.errors['rut'][0]), "'Rut/Passport is not registered': {}".format(body['rut']))
+        self.assertEqual(str(serializer.errors['course'][0]), "Course key not valid or dont exists: {}".format(body['course']))
+
+class TestUnenrollAPI(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestUnenrollAPI, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            self.student = UserFactory(
+                username='student',
+                password='12345',
+                email='student@edx.org')
+            self.student_2 = UserFactory(
+                username='student2',
+                password='12345',
+                email='student2@edx.org')
+        
+
+    def test_unenroll_api(self):
+        """
+            Test unenroll api
+        """
+        na_user = NAExtraInfo.objects.create(
+            user=self.student,
+            na_names='names',
+            na_lastname_p='father lastname',
+            na_lastname_m='mother lastname',
+            na_rut='11111111-1',
+            na_birth_date='10/10/2020',
+            na_phone='123456789'
+        )
+        body = {
+            "rut":na_user.na_rut,
+            "course":str(self.course.id)
+        }
+        UnenrollApi().unenroll_user(body)
+
 class TestEnrollExportCSV(ModuleStoreTestCase):
     def setUp(self):
         super(TestEnrollExportCSV, self).setUp()
@@ -389,6 +638,85 @@ class TestReRunPendingCourse(ModuleStoreTestCase):
         """
         response = self.client.post(reverse('norteamericanoapi:pending-courses'))
         self.assertEqual(response.status_code, 405)
+
+class TestReRunPendingCourseSerializers(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestReRunPendingCourseSerializers, self).setUp()
+        self.created_user = UserFactory()
+        self.new_course = CourseLocator("test_org", "test_course_num", "test_run")
+        CourseRerunState.objects.initiated(
+            source_course_key=CourseLocator("source_org", "source_course_num", "source_run"),
+            destination_course_key=self.new_course,
+            user=self.created_user,
+            display_name="destination course name",
+        )
+
+    def test_pending_rerun_serializers(self):
+        """
+            Test pending rerun serializers
+        """
+        body = {
+            "course":'all'
+        }
+        serializer = ReRunPendingCourseSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+
+        body = {
+            "course":str(self.new_course)
+        }
+        serializer = ReRunPendingCourseSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_pending_rerun_serializers_not_valid(self):
+        """
+            test pending rerun serializers when is not valid
+        """
+        body = {
+            "course":'course-v1:eol+Test202v2 2022'
+        }
+        serializer = ReRunPendingCourseSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 1)
+        self.assertEqual(str(serializer.errors['course'][0]), "Course key not valid or dont exists: {}".format(body['course']))
+
+        body = {
+            "course":'course-v1:eol+Test202v2+2022'
+        }
+        serializer = ReRunPendingCourseSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 1)
+        self.assertEqual(str(serializer.errors['course'][0]), "Course key not valid or dont exists: {}".format(body['course']))
+
+class TestReRunPendingCourseAPI(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestReRunPendingCourseAPI, self).setUp()
+        self.created_user = UserFactory()
+        self.new_course = CourseLocator("test_org", "test_course_num", "test_run")
+        self.source_course = CourseLocator("source_org", "source_course_num", "source_run")
+        CourseRerunState.objects.initiated(
+            source_course_key=self.source_course,
+            destination_course_key=self.new_course,
+            user=self.created_user,
+            display_name="destination course name",
+        )
+
+    def test_pending_rerun_api(self):
+        """
+            Test pending rerun api
+        """
+        body = {
+            "course":'all'
+        }
+        base_url ='https://test.web.st/login'
+        expected = [{'new_course_id':str(self.new_course), 'origen_course_id': str(self.source_course), 'display_name': 'destination course name', 'state': 'in_progress', 'new_course_url': '{}course/{}'.format(base_url,str(self.new_course))}]
+        response = ReRunPendingCourseApi().pending_courses(body, base_url)
+        self.assertEqual(response, expected)
+
+        body = {
+            "course":str(self.new_course)
+        }
+        response = ReRunPendingCourseApi().pending_courses(body, base_url)
+        self.assertEqual(response, expected)
 
 class TestReRun(ModuleStoreTestCase):
     def setUp(self):
@@ -616,6 +944,108 @@ class TestReRun(ModuleStoreTestCase):
         data = [x.decode() for x in response._container]
         expect = ['','Course Id;Nuevo Course Id;Nombre curso nuevo;Fecha de Inicio(UTC);Fecha de Termino(UTC);Estado\r\n', aux]
         self.assertEqual(data, expect)
+
+class TestReRunSerializers(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestReRunSerializers, self).setUp()
+        self.new_course = CourseLocator("test_org", "test_course_num", "test_run")
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+
+    def test_rerun_serializers(self):
+        """
+            Test rerun serializers
+        """
+        body = {
+            "source_course":str(self.course.id),
+            "new_course":str(self.new_course),
+            "display_name":"test name",
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2023"
+        }
+        serializer = ReRunSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+
+    def test_rerun_serializers_not_valid(self):
+        """
+            test rerun serializers when is not valid
+        """
+        body = {
+            "source_course":str(self.new_course),
+            "new_course":str(self.course.id),
+            "display_name":"",
+            "start_date":"00:00-01/01/2022",
+            "end_date":"00:00 01/30/2023"
+        }
+        serializer = ReRunSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 5)
+        self.assertEqual(str(serializer.errors['source_course'][0]), "Source Course key not valid or dont exists: {}".format(body["source_course"]))
+        self.assertEqual(str(serializer.errors['new_course'][0]), "New Course key already exists: {}".format(body['new_course']))
+        self.assertEqual(str(serializer.errors['display_name'][0]), 'This field may not be blank.')
+        self.assertEqual(str(serializer.errors['start_date'][0]), "Wrong format start_date: {}, must be 'HH:MM DD/MM/YYYY'".format(body['start_date']))
+        self.assertEqual(str(serializer.errors['end_date'][0]), "Wrong format end_date: {}, must be 'HH:MM DD/MM/YYYY'".format(body['end_date']))
+
+        body = {
+            "source_course":str(self.course.id),
+            "new_course":str(self.new_course),
+            "display_name":"test name",
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2021"
+        }
+        serializer = ReRunSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 1)
+        self.assertEqual(str(serializer.errors['non_field_errors'][0]), "end_date must be later than the start_date.")
+
+class TestReRunAPI(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestReRunAPI, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            # staff user
+            self.user_staff = UserFactory(
+                username='testuser3',
+                password='12345',
+                email='student2@edx.org',
+                is_staff=True)
+
+    def test_rerun_api(self):
+        """
+            Test rerun api
+        """
+        # rerun from mongo into split
+        split_course3_id = CourseLocator(
+            org="edx3", course="split3", run="rerun_test"
+        )
+        # Mark the action as initiated
+        fields = {'display_name': 'rerun'}
+        CourseRerunState.objects.initiated(self.course.id, split_course3_id, self.user_staff, fields['display_name'])
+
+        body = {
+            "source_course":str(self.course.id),
+            "new_course":str(split_course3_id),
+            "display_name":"test name",
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2023"
+        }
+        base_url ='https://test.web.st/login'
+        expected = {'new_course_url':'{}course/{}'.format(base_url,str(split_course3_id)), "status": 'Procesandose','result':'success'}
+
+        response = ReRunApi().rerun_courses(body, self.user_staff, base_url)
+        self.assertTrue(has_course_author_access(self.user_staff, split_course3_id), "Didn't grant access")
+        rerun_state = CourseRerunState.objects.find_first(course_key=split_course3_id)
+        self.assertEqual(rerun_state.state, CourseRerunUIStateManager.State.SUCCEEDED)
+        self.assertEqual(response, expected)
 
 class TestReRunExportCSV(ModuleStoreTestCase):
     def setUp(self):

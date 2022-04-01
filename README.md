@@ -5,6 +5,7 @@
 
     docker-compose exec lms pip install -e /openedx/requirements/norteamericanoapi
     docker-compose exec cms pip install -e /openedx/requirements/norteamericanoapi
+    docker-compose exec cms_worker pip install -e /openedx/requirements/norteamericanoapi
 
 ## TESTS
 **Prepare tests:**
