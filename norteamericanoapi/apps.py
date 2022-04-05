@@ -15,7 +15,13 @@ class NorteamericanoAPIConfig(AppConfig):
                 PluginURLs.NAMESPACE: "norteamericanoapi",
                 PluginURLs.REGEX: r"^norteamericano_api/",
                 PluginURLs.RELATIVE_PATH: "urls",
-            }},
+            },
+            ProjectType.LMS: {
+                PluginURLs.NAMESPACE: "norteamericanoapi",
+                PluginURLs.REGEX: r"^norteamericano_api/",
+                PluginURLs.RELATIVE_PATH: "urls_lms",
+            },
+        },
         PluginSettings.CONFIG: {
             ProjectType.CMS: {
                 SettingsType.COMMON: {

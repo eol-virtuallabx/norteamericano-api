@@ -14,7 +14,15 @@ services:
     restart: unless-stopped
 
   cms:
-    image: eoluchile/edx-platform:testing-lilac
+    image: eoluchile/edx-platform:testing-koa
+    volumes:
+      - ../:/openedx/requirements/norteamericanoapi
+    depends_on:
+      - memcached
+      - mongodb
+  
+  lms:
+    image: eoluchile/edx-platform:testing-koa
     volumes:
       - ../:/openedx/requirements/norteamericanoapi
     depends_on:

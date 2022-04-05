@@ -33,10 +33,10 @@ def enroll_email(data, login_url):
         'login_url': login_url,
         'user_name': data['user_name']
     }
-    if data['password'] != '':
-        html_message = render_to_string('emails/exists_user_email.txt', context)
+    if data['password'] == '':
+        html_message = render_to_string('na_emails/exists_user_email.txt', context)
     else:
-        html_message = render_to_string('emails/normal_email.txt', context)
+        html_message = render_to_string('na_emails/normal_email.txt', context)
     plain_message = strip_tags(html_message)
     from_email = configuration_helpers.get_value(
         'email_from_address',

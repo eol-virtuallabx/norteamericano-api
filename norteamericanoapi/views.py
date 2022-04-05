@@ -10,7 +10,6 @@ from django.http import HttpResponse
 from .utils import file_to_csvreader, validate_course, validate_user, enroll_create_user_with_custom_fields, rerun_courses, HAVE_NA_MODEL
 from .email_tasks import enroll_email
 from common.djangoapps.edxmako.shortcuts import render_to_response
-from cms.djangoapps.contentstore.views.course import get_in_process_course_actions
 import logging
 import json
 import csv
@@ -49,7 +48,7 @@ class NorteamericanoEnroll(View):
             csv_data = [x for x in csv_reader]
             data = enroll_create_user_with_custom_fields(csv_data, request.POST.get('mode'))
             
-            login_url = request.build_absolute_uri('/login')
+            login_url = 'https://{}/login'.format(settings.LMS_BASE)
             for email in data['emails_data']:
                 enroll_email.delay(email, login_url)
             response = HttpResponse(content_type='text/csv')
@@ -102,6 +101,7 @@ class NorteamericanoReRunPendingCourse(View):
         Get pending rerun courses
     """
     def get(self, request):
+        from cms.djangoapps.contentstore.views.course import get_in_process_course_actions
         if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
             aux = get_in_process_course_actions(request)
             pending_courses = [ {'new_course_id':str(x.course_key), 'origen_course_id': str(x.source_course_key), 'display_name': x.display_name, 'state': x.state} for x in aux ]
