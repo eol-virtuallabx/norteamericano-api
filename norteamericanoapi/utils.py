@@ -11,7 +11,6 @@ from itertools import cycle
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys import InvalidKeyError
 from lms.djangoapps.courseware.courses import get_course_by_id, get_course_with_access
-from cms.djangoapps.contentstore.views.course import rerun_course
 from xmodule.modulestore.django import modulestore
 from common.djangoapps.student import auth
 from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
@@ -355,6 +354,7 @@ def rerun_courses(csv_data, user):
     """
         ReRun Courses from CSV file
     """
+    from cms.djangoapps.contentstore.views.course import rerun_course
     new_data = [['Course Id', 'Nuevo Course Id', 'Nombre curso nuevo', 'Fecha de Inicio(UTC)', 'Fecha de Termino(UTC)', 'Estado']]
     for course_ids in csv_data:
         if len(course_ids) < 5:

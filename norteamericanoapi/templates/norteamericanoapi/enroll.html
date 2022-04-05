@@ -1,8 +1,9 @@
 ## mako 
 
 <%page expression_filter="h"/>
-<%inherit file="../base.html" />
-<%block name="title">Inscripción</%block>
+<%! from django.utils.translation import ugettext as _ %>
+<%inherit file="../main.html" />
+<%block name="pagetitle">${_("Inscripcion")}</%block>
 <%block name="content">
 <main id="main" aria-label="Content" tabindex="-1" class="static_pages" style="background-color: #fff;padding: 30px;">
     <style>

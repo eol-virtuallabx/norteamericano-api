@@ -13,7 +13,6 @@ from .serializers import EnrollSerializer, UnEnrollSerializer, ReRunPendingCours
 from .email_tasks import enroll_email
 from .utils import create_user_by_data, create_na_user, enroll_course_user, get_course_by_id
 from common.djangoapps.course_action_state.models import CourseRerunState, CourseRerunUIStateManager
-from cms.djangoapps.contentstore.views.course import rerun_course
 from openedx.core.lib.api.authentication import BearerAuthentication
 from datetime import datetime as dt
 from rest_framework import permissions
@@ -197,6 +196,7 @@ class ReRunApi(APIView):
             return Response({'error': 'User dont have permission'}, status=status.HTTP_400_BAD_REQUEST)
 
     def rerun_courses(self, data, user, base_url):
+        from cms.djangoapps.contentstore.views.course import rerun_course
         start_date = dt.strptime(data['start_date']+' +0000', "%H:%M %d/%m/%Y %z")
         end_date = dt.strptime(data['end_date']+' +0000', "%H:%M %d/%m/%Y %z")
         source_course_key = CourseKey.from_string(data['source_course'])
