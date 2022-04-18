@@ -199,21 +199,23 @@ def set_data_course(course_key, start_date, end_date, user):
     with transaction.atomic():
         course = CourseOverview.objects.get(id=course_key)
         data = {}
+        course_details = CourseDetails.fetch(course_key).__dict__
         if start_date:
             start = dt.strptime(start_date+' +0000', "%H:%M %d/%m/%Y %z")
             data['start_date'] = start.strftime("%Y-%m-%dT%H:%M:%S")+'Z'
+            course_details['start_date'] = data['start_date']
         else:
             start = course.start_date
         if end_date:
             end = dt.strptime(end_date+' +0000', "%H:%M %d/%m/%Y %z")
             data['end_date'] = end.strftime("%Y-%m-%dT%H:%M:%S")+'Z'
+            course_details['end_date'] = data['end_date']
         else:
             end = course.end_date
-        if end <= start:
+        if end is not None and end <= start:
             return False
         if data:
-            data['intro_video'] = CourseDetails.fetch_youtube_video_id(course_key)
-            CourseDetails.update_from_json(course_key, data, user)
+            CourseDetails.update_from_json(course_key, course_details, user)
         return True
 
 def is_course_staff(user, course_id):
