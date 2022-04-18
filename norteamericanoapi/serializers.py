@@ -149,3 +149,88 @@ class ReRunSerializer(serializers.Serializer):
             logger.error('NAReRunSerializer - Wrong format date, must be HH:MM DD/MM/YYYY')
             raise serializers.ValidationError(u"Wrong format date, must be 'HH:MM DD/MM/YYYY'")
         return attrs
+
+class CourseStaffEnrollSerializer(serializers.Serializer):
+    rut =serializers.CharField(required=True)
+    course =serializers.CharField(required=True)
+    action =serializers.ChoiceField(
+        choices=(
+            ('enroll', 'enroll'),
+            ('unenroll', 'unenroll')
+        ),
+        required=True
+    )
+    def validate_rut(self, value):
+        rut = value
+        if not validarRutAllType(rut):
+            logger.error("NACourseStaffEnrollSerializer - 'Rut/Passport invalid': {}".format(rut))
+            raise serializers.ValidationError(u"'Rut/Passport invalid': {}".format(rut))
+        rut = rut.upper()
+        rut = rut.replace("-", "")
+        rut = rut.replace(".", "")
+        rut = rut.strip()
+        if rut[0] != 'P':
+            rut = '{}-{}'.format(rut[:-1], rut[-1])
+        if not NAExtraInfo.objects.filter(na_rut=rut).exists():
+            logger.error("NACourseStaffEnrollSerializer - 'Rut/Passport is not registered': {}".format(rut))
+            raise serializers.ValidationError(u"'Rut/Passport is not registered': {}".format(rut))
+        return rut
+
+    def validate_course(self, value):
+        course = value
+        if not utils_validate_course(course):
+            logger.error('NACourseStaffEnrollSerializer - Course key not valid or dont exists: {}'.format(course))
+            raise serializers.ValidationError(u"Course key not valid or dont exists: {}".format(course))
+        return course
+
+class CourseDataSerializer(serializers.Serializer):
+    course =serializers.CharField(required=True, allow_blank=False)
+    start_date =serializers.CharField(required=False)
+    end_date =serializers.CharField(required=False)
+
+    def validate_course(self, value):
+        course = value
+        if not utils_validate_course(course):
+            logger.error('NACourseDataSerializer - Course key not valid or dont exists: {}'.format(course))
+            raise serializers.ValidationError(u"Course key not valid or dont exists: {}".format(course))
+        return course
+
+    def validate_start_date(self, value):
+        start_date = value
+        try:
+            aux = dt.strptime(start_date+' +0000', "%H:%M %d/%m/%Y %z")
+        except ValueError:
+            logger.error('NACourseDataSerializer - Wrong format start_date: {}, must be HH:MM DD/MM/YYYY'.format(start_date))
+            raise serializers.ValidationError(u"Wrong format start_date: {}, must be 'HH:MM DD/MM/YYYY'".format(start_date))
+        return start_date
+    
+    def validate_end_date(self, value):
+        end_date = value
+        try:
+            aux = dt.strptime(end_date+' +0000', "%H:%M %d/%m/%Y %z")
+        except ValueError:
+            logger.error('NACourseDataSerializer - Wrong format end_date: {}, must be HH:MM DD/MM/YYYY'.format(end_date))
+            raise serializers.ValidationError(u"Wrong format end_date: {}, must be 'HH:MM DD/MM/YYYY'".format(end_date))
+        return end_date
+
+    def validate(self, attrs):
+        if 'start_date' in attrs or 'end_date' in attrs:
+            if 'start_date' in attrs:
+                try:
+                    start_date = dt.strptime(attrs.get('start_date', '')+' +0000', "%H:%M %d/%m/%Y %z")
+                except ValueError:
+                    logger.error('NACourseDataSerializer - Wrong format date, must be HH:MM DD/MM/YYYY')
+                    raise serializers.ValidationError(u"Wrong format date, must be 'HH:MM DD/MM/YYYY'")
+            if 'end_date' in attrs:
+                try:
+                    end_date = dt.strptime(attrs.get('end_date', '')+' +0000', "%H:%M %d/%m/%Y %z")
+                except ValueError:
+                    logger.error('NACourseDataSerializer - Wrong format date, must be HH:MM DD/MM/YYYY')
+                    raise serializers.ValidationError(u"Wrong format date, must be 'HH:MM DD/MM/YYYY'")
+            if 'start_date' in attrs and 'end_date' in attrs and end_date <= start_date:
+                logger.error('NACourseDataSerializer - end_date must be later than the start_date.')
+                raise serializers.ValidationError(u"end_date must be later than the start_date.")
+            return attrs
+        else:
+            logger.error('NACourseDataSerializer - start_date or end_date are not defined')
+            raise serializers.ValidationError(u"Wrong format date, must be 'HH:MM DD/MM/YYYY'")

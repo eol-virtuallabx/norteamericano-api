@@ -3,7 +3,7 @@ from django.conf.urls import url
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from .views import *
-from .rest_api import EnrollApi, UnenrollApi, ReRunPendingCourseApi, ReRunApi
+from .rest_api import ReRunPendingCourseApi, ReRunApi, CourseDataApi
 
 
 urlpatterns = [
@@ -12,4 +12,5 @@ urlpatterns = [
     url(r'^rerun/$', NorteamericanoReRun.as_view(), name='rerun'),
     url(r'^rerun-export/$', NorteamericanoReRunExport.as_view(), name='rerun-export'),
     url(r'^pending-courses/$', NorteamericanoReRunPendingCourse.as_view(), name='pending-courses'),
+    url(r'^api/v0/course-data/$', CourseDataApi.as_view(), name='course-data-api'),
 ]
