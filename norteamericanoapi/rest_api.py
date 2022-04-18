@@ -9,9 +9,9 @@ from django.db import transaction
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .views import NorteamericanoEnroll
-from .serializers import EnrollSerializer, UnEnrollSerializer, ReRunPendingCourseSerializer, ReRunSerializer
+from .serializers import EnrollSerializer, UnEnrollSerializer, ReRunPendingCourseSerializer, ReRunSerializer, CourseStaffEnrollSerializer, CourseDataSerializer
 from .email_tasks import enroll_email
-from .utils import create_user_by_data, create_na_user, enroll_course_user, get_course_by_id
+from .utils import create_user_by_data, create_na_user, enroll_course_user, get_course_by_id, add_role_course_staff, remove_role_course_staff, set_data_course
 from common.djangoapps.course_action_state.models import CourseRerunState, CourseRerunUIStateManager
 from openedx.core.lib.api.authentication import BearerAuthentication
 from datetime import datetime as dt
@@ -219,3 +219,75 @@ class ReRunApi(APIView):
         else:
             response = {'new_course_url':'{}course/{}'.format(base_url,str(new_course_id)), "status": 'Procesandose','result':'success'}
         return response
+
+class CourseStaffEnrollApi(APIView):
+    authentication_classes = (BearerAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, format=None):
+        if HAVE_NA_MODEL is False:
+            logger.error("NorteamericanoApiCourseStaffEnroll - Model is not installed")
+            return Response({'error': "Model is not installed"}, status=status.HTTP_400_BAD_REQUEST)
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
+            serializer = CourseStaffEnrollSerializer(data=request.data)
+            if serializer.is_valid():
+                self.coursestaff_user(serializer.data)
+                return Response(data={'result':'success'}, status=status.HTTP_200_OK)
+            else:
+                logger.error("NorteamericanoApiCourseStaffEnroll - serializer is not valid")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            logger.error("NorteamericanoApiCourseStaffEnroll - User is Anonymous or dont have permission")
+            return Response({'error': 'User dont have permission'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def coursestaff_user(self, data):
+        from common.djangoapps.student.models import CourseEnrollment, CourseEnrollmentAllowed
+        course_id = data['course']
+        course_key = CourseKey.from_string(course_id)
+        rut = data['rut']
+        action = data['action']
+        with transaction.atomic():
+            na_user = NAExtraInfo.objects.get(na_rut=rut)
+            if action == 'enroll':
+                enroll_course_user(na_user.user, data['course'], 'audit')
+                add_role_course_staff(na_user.user, course_key)
+            else:
+                remove_role_course_staff(na_user.user, course_key)
+                #unenroll CourseEnrollmentAllowed
+                enrollmentAllowed = CourseEnrollmentAllowed.objects.filter(
+                    course_id=course_key, user__naextrainfo=na_user)
+                if enrollmentAllowed:
+                    enrollmentAllowed.delete()
+                #unenroll CourseEnrollment
+                enrollment = CourseEnrollment.objects.filter(user__naextrainfo=na_user, course_id=course_key)
+                if enrollment:
+                    enrollment.update(is_active=0)
+
+class CourseDataApi(APIView):
+    authentication_classes = (BearerAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, format=None):
+        if not request.user.is_anonymous and request.user.has_perm('norteamericano_form.na_instructor_staff'):
+            serializer = CourseDataSerializer(data=request.data)
+            if serializer.is_valid():
+                result = self.set_data(serializer.data, request.user)
+                if result:
+                    return Response(data={'result':'success'}, status=status.HTTP_200_OK)
+                else:
+                    logger.error("NorteamericanoApiCourseData - end_date must be later than the start_date.")
+                    return Response(data={'result':'error', 'error': 'end_date must be later than the start_date'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                logger.error("NorteamericanoApiCourseData - serializer is not valid")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            logger.error("NorteamericanoApiCourseData - User is Anonymous or dont have permission")
+            return Response({'error': 'User dont have permission'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def set_data(self, data, user):
+        course_id = data['course']
+        course_key = CourseKey.from_string(course_id)
+        start_date = data.get('start_date', None)
+        end_date = data.get('end_date', None)
+        result = set_data_course(course_key, start_date, end_date, user)
+        return result

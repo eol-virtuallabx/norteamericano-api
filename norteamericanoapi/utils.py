@@ -17,6 +17,7 @@ from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRol
 from common.djangoapps.course_action_state.models import CourseRerunState
 from xmodule.modulestore import EdxJSONEncoder
 from xmodule.course_module import DEFAULT_START_DATE, CourseFields
+from openedx.core.djangoapps.models.course_details import CourseDetails
 from lms.djangoapps.courseware.access import has_access
 from datetime import datetime as dt
 import unidecode
@@ -190,6 +191,31 @@ def validate_course_pending_course(course_id):
         logger.error("Norteamericano error validate_course_pending_course, invalid format: {}".format(course_id))
         return False
 
+def set_data_course(course_key, start_date, end_date, user):
+    """
+        Set start_date and/or end_date
+    """
+    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+    with transaction.atomic():
+        course = CourseOverview.objects.get(id=course_key)
+        data = {}
+        if start_date:
+            start = dt.strptime(start_date+' +0000', "%H:%M %d/%m/%Y %z")
+            data['start_date'] = start.strftime("%Y-%m-%dT%H:%M:%S")+'Z'
+        else:
+            start = course.start_date
+        if end_date:
+            end = dt.strptime(end_date+' +0000', "%H:%M %d/%m/%Y %z")
+            data['end_date'] = end.strftime("%Y-%m-%dT%H:%M:%S")+'Z'
+        else:
+            end = course.end_date
+        if end <= start:
+            return False
+        if data:
+            data['intro_video'] = CourseDetails.fetch_youtube_video_id(course_key)
+            CourseDetails.update_from_json(course_key, data, user)
+        return True
+
 def is_course_staff(user, course_id):
     """
         Verify if the user is staff course
@@ -237,6 +263,20 @@ def enroll_course_user(user, course, mode):
         user,
         CourseKey.from_string(course),
         mode=mode)
+
+def add_role_course_staff(user, course_key):
+    """
+        Add instructor role
+    """
+    role = CourseInstructorRole(course_key)
+    role.add_users(user)
+
+def remove_role_course_staff(user, course_key):
+    """
+        Remove instructor role
+    """
+    role = CourseInstructorRole(course_key)
+    role.remove_users(user)
 
 def file_to_csvreader(csvfile):
     """

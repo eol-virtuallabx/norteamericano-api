@@ -13,14 +13,15 @@ from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from openedx.core.djangoapps.models.course_details import CourseDetails
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from common.djangoapps.student.tests.factories import CourseEnrollmentAllowedFactory, UserFactory, CourseEnrollmentFactory
 from common.djangoapps.student.auth import has_course_author_access
 from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
 from common.djangoapps.course_action_state.models import CourseRerunState
 from common.djangoapps.course_action_state.managers import CourseRerunUIStateManager
-from norteamericanoapi.rest_api import ReRunPendingCourseApi, ReRunApi
-from norteamericanoapi.serializers import ReRunPendingCourseSerializer, ReRunSerializer
+from norteamericanoapi.rest_api import ReRunPendingCourseApi, ReRunApi, CourseDataApi
+from norteamericanoapi.serializers import ReRunPendingCourseSerializer, ReRunSerializer, CourseDataSerializer
 from django.test.utils import override_settings
 from unittest.case import SkipTest
 import re
@@ -484,6 +485,107 @@ class TestReRunAPI(ModuleStoreTestCase):
         rerun_state = CourseRerunState.objects.find_first(course_key=split_course3_id)
         self.assertEqual(rerun_state.state, CourseRerunUIStateManager.State.SUCCEEDED)
         self.assertEqual(response, expected)
+
+class TestCourseDataSerializers(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestCourseDataSerializers, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+
+    def test_coursedata_serializers(self):
+        """
+            Test coursedata serializers
+        """
+        body = {
+            "course":str(self.course.id),
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2023"
+        }
+        serializer = CourseDataSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+
+        body = {
+            "course":str(self.course.id),
+            "end_date":"00:00 01/01/2023"
+        }
+        serializer = CourseDataSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+
+    def test_coursedata_serializers_not_valid(self):
+        """
+            test coursedata serializers when is not valid
+        """
+        body = {
+            "course":'course-v1:eol+Test202v2 2022',
+            "start_date":"00:00-01/01/2022",
+            "end_date":"00:00 01/30/2023"
+        }
+        serializer = CourseDataSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 3)
+        self.assertEqual(str(serializer.errors['course'][0]), "Course key not valid or dont exists: {}".format(body["course"]))
+        self.assertEqual(str(serializer.errors['start_date'][0]), "Wrong format start_date: {}, must be 'HH:MM DD/MM/YYYY'".format(body['start_date']))
+        self.assertEqual(str(serializer.errors['end_date'][0]), "Wrong format end_date: {}, must be 'HH:MM DD/MM/YYYY'".format(body['end_date']))
+
+        body = {
+            "course":str(self.course.id),
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2021"
+        }
+        serializer = CourseDataSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 1)
+        self.assertEqual(str(serializer.errors['non_field_errors'][0]), "end_date must be later than the start_date.")
+
+class TestCourseDataAPI(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestCourseDataAPI, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            # staff user
+            self.user_staff = UserFactory(
+                username='testuser3',
+                password='12345',
+                email='student2@edx.org',
+                is_staff=True)
+
+    def test_coursedata_api(self):
+        """
+            Test coursedata api
+        """
+        jsondetails = CourseDetails.fetch(self.course.id)
+        body = {
+            "course":str(self.course.id),
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2023"
+        }
+        response = CourseDataApi().set_data(body, self.user_staff)
+        self.assertTrue(response)
+        jsondetails = CourseDetails.fetch(self.course.id)
+        self.assertEqual(jsondetails.start_date.strftime("%H:%M %d/%m/%Y"), body['start_date'])
+        self.assertEqual(jsondetails.end_date.strftime("%H:%M %d/%m/%Y"), body['end_date'])
+
+    def test_coursedata_api_error(self):
+        """
+            Test coursedata api wrong date
+        """
+        jsondetails = CourseDetails.fetch(self.course.id)
+        body = {
+            "course":str(self.course.id),
+            "start_date":"00:00 01/01/2022",
+            "end_date":"00:00 01/01/2020"
+        }
+        response = CourseDataApi().set_data(body, self.user_staff)
+        self.assertFalse(response)
 
 class TestReRunExportCSV(ModuleStoreTestCase):
     def setUp(self):

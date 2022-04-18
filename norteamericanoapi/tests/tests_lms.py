@@ -20,8 +20,8 @@ from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRol
 from common.djangoapps.course_action_state.models import CourseRerunState
 from common.djangoapps.course_action_state.managers import CourseRerunUIStateManager
 from norteamericanoapi.utils import create_user_by_data, generate_username
-from norteamericanoapi.rest_api import EnrollApi, UnenrollApi
-from norteamericanoapi.serializers import EnrollSerializer, UnEnrollSerializer
+from norteamericanoapi.rest_api import EnrollApi, UnenrollApi, CourseStaffEnrollApi
+from norteamericanoapi.serializers import EnrollSerializer, UnEnrollSerializer, CourseStaffEnrollSerializer
 from django.test.utils import override_settings
 from unittest.case import SkipTest
 import re
@@ -593,3 +593,119 @@ class TestEnrollExportCSV(ModuleStoreTestCase):
         """
         response = self.client.post(reverse('norteamericanoapi:enroll-export'))
         self.assertEqual(response.status_code, 405)
+
+class TestCourseStaffEnrollSerializers(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestCourseStaffEnrollSerializers, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            self.student = UserFactory(
+                username='student',
+                password='12345',
+                email='student@edx.org')
+            self.na_user = NAExtraInfo.objects.create(
+                user=self.student,
+                na_names='names',
+                na_lastname_p='father lastname',
+                na_lastname_m='mother lastname',
+                na_rut='P123456789',
+                na_birth_date='10/10/2020',
+                na_phone='123456789'
+            )
+
+    def test_coursestaff_serializers(self):
+        """
+            Test coursestaff serializers
+        """
+        
+        body = {
+            "rut":self.na_user.na_rut,
+            "course":str(self.course.id),
+            "action":'enroll'
+        }
+        serializer = CourseStaffEnrollSerializer(data=body)
+        self.assertTrue(serializer.is_valid())
+    
+    def test_coursestaff_serializers_not_valid(self):
+        """
+            test coursestaff serializers when is not valid       
+        """
+        body = {
+            "rut":'P23456789',
+            "course":'course-v1:eol+Test202v2 2022',
+            "action":'aenroll'
+        }
+        serializer = CourseStaffEnrollSerializer(data=body)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(len(serializer.errors), 3)
+        self.assertEqual(str(serializer.errors['rut'][0]), "'Rut/Passport is not registered': {}".format(body['rut']))
+        self.assertEqual(str(serializer.errors['course'][0]), "Course key not valid or dont exists: {}".format(body['course']))
+        self.assertEqual(str(serializer.errors['action'][0]), '"{}" is not a valid choice.'.format(body['action']))
+
+class TestCourseStaffEnrollApi(ModuleStoreTestCase):
+    def setUp(self):
+        super(TestCourseStaffEnrollApi, self).setUp()
+        self.course = CourseFactory.create(
+            org='mss',
+            course='999',
+            display_name='2022',
+            emit_signals=True)
+        aux = CourseOverview.get_from_id(self.course.id)
+        with patch('common.djangoapps.student.models.cc.User.save'):
+            self.student = UserFactory(
+                username='student123',
+                password='12345',
+                email='student123@edx.org')
+            self.na_user = NAExtraInfo.objects.create(
+                user=self.student,
+                na_names='names',
+                na_lastname_p='father lastname',
+                na_lastname_m='mother lastname',
+                na_rut='P123456789',
+                na_birth_date='10/10/2020',
+                na_phone='123456789'
+            )
+            self.student2 = UserFactory(
+                username='student222',
+                password='12345',
+                email='student222@edx.org')
+            self.na_user2 = NAExtraInfo.objects.create(
+                user=self.student2,
+                na_names='names',
+                na_lastname_p='father lastname',
+                na_lastname_m='mother lastname',
+                na_rut='P22222222',
+                na_birth_date='10/10/2020',
+                na_phone='123456789'
+            )
+            role = CourseInstructorRole(self.course.id)
+            role.add_users(self.student2)
+
+    def test_coursestaff_api_enroll(self):
+        """
+            Test coursestaff api enroll instructor user
+        """
+        body = {
+            "rut":self.na_user.na_rut,
+            "course":str(self.course.id),
+            "action":'enroll'
+        }
+        CourseStaffEnrollApi().coursestaff_user(body)
+        self.assertTrue(CourseInstructorRole(self.course.id).has_user(self.student))
+    
+    def test_coursestaff_api_unenroll(self):
+        """
+            Test coursestaff api unenroll instructor user
+        """
+        body = {
+            "rut":self.na_user2.na_rut,
+            "course":str(self.course.id),
+            "action":'unenroll'
+        }
+        CourseStaffEnrollApi().coursestaff_user(body)
+        self.assertFalse(CourseInstructorRole(self.course.id).has_user(self.student2))
